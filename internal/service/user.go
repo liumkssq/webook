@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/liumkssq/webook/internal/domain"
 	"github.com/liumkssq/webook/internal/repository"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -41,18 +42,34 @@ func (svc *userService) Login(ctx context.Context, email, password string) (doma
 }
 
 func (svc *userService) SignUp(ctx context.Context, u domain.User) error {
-	//todo
-	panic("")
+	hash, err := bcrypt.GenerateFromPassword([]byte(u.PassWord), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	u.PassWord = string(hash)
+	// 然后就是，存起来
+	return svc.repo.Create(ctx, u)
 }
 
 func (svc *userService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
-	//TODO implement me
-	panic("implement me")
+	u, err := svc.repo.FindByPhone(ctx, phone)
+	if err != repository.ErrUserNotFound {
+		return u, err
+	}
+	zap.L().Info("用户不存在，自动创建新用户")
+	u = domain.User{
+		Phone: phone,
+	}
+	err = svc.repo.Create(ctx, u)
+	if err != nil && err != repository.ErrUserDuplicate {
+		return domain.User{}, err
+	}
+	//主从延迟
+	return svc.repo.FindByPhone(ctx, phone)
 }
 
 func (svc *userService) Profile(ctx context.Context, id int64) (domain.User, error) {
-	//TODO implement me
-	panic("implement me")
+	return svc.repo.FindById(ctx, id)
 }
 
 func NewUserService(repo repository.UserRepository) UserService {

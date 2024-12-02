@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"github.com/liumkssq/webook/internal/domain"
 	"github.com/liumkssq/webook/internal/repository/dao"
 	"time"
@@ -54,19 +55,50 @@ func (r *CachedUserRepository) entityToDomain(u dao.User) domain.User {
 	}
 }
 
+func (r *CachedUserRepository) domainToEntity(u domain.User) dao.User {
+	return dao.User{
+		Id: u.Id,
+		Email: sql.NullString{
+			String: u.Email,
+			// 我确实有手机号
+			Valid: u.Email != "",
+		},
+		Phone: sql.NullString{
+			String: u.Phone,
+			Valid:  u.Phone != "",
+		},
+		Password: u.PassWord,
+		//WechatOpenID: sql.NullString{
+		//	String: u.WechatInfo.OpenID,
+		//	Valid:  u.WechatInfo.OpenID != "",
+		//},
+		//WechatUnionID: sql.NullString{
+		//	String: u.WechatInfo.UnionID,
+		//	Valid:  u.WechatInfo.UnionID != "",
+		//},
+		Ctime: u.Ctime.UnixMilli(),
+	}
+}
+
 func (r *CachedUserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
-	//TODO implement me
-	panic("implement me")
+	u, err := r.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, nil
+	}
+	return r.entityToDomain(u), nil
 }
 
 func (r *CachedUserRepository) Create(ctx context.Context, u domain.User) error {
-	//TODO implement me
-	panic("implement me")
+	return r.dao.Insert(ctx, r.domainToEntity(u))
 }
 
 func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
-	//TODO implement me
-	panic("implement me")
+	//todo redis
+	ue, err := r.dao.FindById(ctx, id)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return r.entityToDomain(ue), nil
 }
 
 func NewCachedUserRepositoryV1(dao dao.UserDAO) UserRepository {

@@ -17,9 +17,7 @@ func InitDB() *gorm.DB {
 	//var cfg Config
 	err := viper.UnmarshalKey("db", &cfg)
 	//fmt.Println(cfg.DSN)
-	db, err := gorm.Open(mysql.Open(cfg.DSN), &gorm.Config{
-		//Logger: glogger.
-	})
+	db, err := gorm.Open(mysql.Open(cfg.DSN), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}

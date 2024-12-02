@@ -17,3 +17,6 @@ etcdctl:
 docker-compose:
 	docker-compose down
 	docker-compose up -d
+
+.PHONY: mock
+mock:
