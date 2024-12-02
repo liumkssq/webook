@@ -2,3 +2,18 @@ db:
   dsn: "root:root@tcp(localhost:13316)/webook"
 redis:
   addr: "localhost:6379"
+
+app:
+  name: "webook"
+  mode: "dev"
+  port: 8080
+  version: "v0.0.1"
+  start_time: "2024-12-01"
+  machine_id: 1
+
+log:
+  level: "info"
+  filename: "web_app.log"
+  max_size: 200
+  max_age: 30
+  max_backups: 7

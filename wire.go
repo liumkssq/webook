@@ -14,7 +14,6 @@ import (
 
 func InitWebServer() *gin.Engine {
 	wire.Build(
-
 		ioc.InitDB,
 		//dao
 		dao.NewGORMUserDAO,

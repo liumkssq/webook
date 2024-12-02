@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Configer interface
 type Configer interface {
 	GetString(ctx context.Context, key string) (string, error)
 	MustGetString(ctx context.Context, key string) string
