@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"github.com/liumkssq/webook/internal/domain"
+	"github.com/liumkssq/webook/internal/repository/cache"
 	"github.com/liumkssq/webook/internal/repository/dao"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -27,8 +29,12 @@ type UserRepository interface {
 type CachedUserRepository struct {
 	dao dao.UserDAO
 	//todo
-	//cache cache.UserCache
-	//testSignal chan struct{}
+	cache      cache.UserCache
+	testSignal chan struct{}
+}
+
+func NewCachedUserRepository(dao dao.UserDAO, cache cache.UserCache) UserRepository {
+	return &CachedUserRepository{dao: dao, cache: cache}
 }
 
 func (r *CachedUserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
@@ -93,14 +99,20 @@ func (r *CachedUserRepository) Create(ctx context.Context, u domain.User) error 
 }
 
 func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
-	//todo redis
+	u, err := r.cache.Get(ctx, id)
+	if err == nil {
+		return u, nil
+	}
 	ue, err := r.dao.FindById(ctx, id)
 	if err != nil {
+		zap.L().Info("根据 id 查询用户失败", zap.Error(err))
 		return domain.User{}, err
 	}
-	return r.entityToDomain(ue), nil
-}
-
-func NewCachedUserRepositoryV1(dao dao.UserDAO) UserRepository {
-	return &CachedUserRepository{dao: dao}
+	u = r.entityToDomain(ue)
+	//异步写入缓存
+	go func() {
+		_ = r.cache.Set(ctx, u)
+		r.testSignal <- struct{}{}
+	}()
+	return u, nil
 }

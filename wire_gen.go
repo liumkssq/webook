@@ -9,9 +9,11 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/liumkssq/webook/internal/repository"
+	"github.com/liumkssq/webook/internal/repository/cache"
 	"github.com/liumkssq/webook/internal/repository/dao"
 	"github.com/liumkssq/webook/internal/service"
 	"github.com/liumkssq/webook/internal/web"
+	"github.com/liumkssq/webook/internal/web/jwt"
 	"github.com/liumkssq/webook/ioc"
 )
 
@@ -22,10 +24,13 @@ import (
 // Injectors from wire.go:
 
 func InitWebServer() *gin.Engine {
-	v := ioc.InitMiddlewares()
+	cmdable := ioc.InitRedis()
+	handler := jwt.NewRedisJWTHandler(cmdable)
+	v := ioc.InitMiddlewares(cmdable, handler)
 	db := ioc.InitDB()
 	userDAO := dao.NewGORMUserDAO(db)
-	userRepository := repository.NewCachedUserRepositoryV1(userDAO)
+	userCache := cache.NewRedisUserCache(cmdable)
+	userRepository := repository.NewCachedUserRepository(userDAO, userCache)
 	userService := service.NewUserService(userRepository)
 	userHandler := web.NewUserHandler(userService)
 	engine := ioc.InitWebServer(v, userHandler)

@@ -4,6 +4,9 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/liumkssq/webook/internal/web"
+	ijwt "github.com/liumkssq/webook/internal/web/jwt"
+	"github.com/liumkssq/webook/internal/web/middleware"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"net"
 	"net/http"
@@ -24,9 +27,19 @@ func InitWebServer(mdls []gin.HandlerFunc,
 	return server
 }
 
-func InitMiddlewares() []gin.HandlerFunc {
+func InitMiddlewares(redisClient redis.Cmdable,
+	jwtHdl ijwt.Handler) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		corsHdl(),
+		middleware.NewLoginJWTMiddlewareBuilder(jwtHdl).
+			IgnorePaths("/users/signup").
+			IgnorePaths("/users/refresh_token").
+			IgnorePaths("/users/login_sms/code/send").
+			IgnorePaths("/users/login_sms").
+			IgnorePaths("/oauth2/wechat/authurl").
+			IgnorePaths("/oauth2/wechat/callback").
+			IgnorePaths("/users/login").
+			Build(),
 		ginRecovery(true),
 		ginLogger(),
 	}
