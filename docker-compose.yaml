@@ -1,4 +1,4 @@
-version: "3"
+version: "3.8"
 # 我这个 docker compose 由几个服务组成
 services:
   mysql8:
@@ -22,11 +22,22 @@ services:
     ports:
       - '6379:6379'
 
+
   etcd:
     image: "bitnami/etcd:latest"
-    restart: always
-    entrypoint:
-      - ALLOW_NON_AUTHENTICATION=yes
+    container_name: webook-etcd-1
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes  # 允许不使用认证
     ports:
-      - "12379:2379"
+      - "12379:2379"                  # 映射客户端访问端口
+    volumes:
+      - etcd-data:/etcd-data          # 持久化数据
+    networks:
+      - etcd_network
 
+networks:
+  etcd_network:
+    driver: bridge
+
+volumes:
+  etcd-data:

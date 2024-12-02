@@ -8,12 +8,10 @@ import (
 type Configer interface {
 	GetString(ctx context.Context, key string) (string, error)
 	MustGetString(ctx context.Context, key string) string
-	GetStringOrDefault(ctc context.Context, key string, def string) string
-
-	//Unmarshal()
+	GetStringOrDefault(ctx context.Context, key string, def string) string
 }
 
-type ViperConfigerAdapter struct {
+type ViperConfigAdapter struct {
 	v *viper.Viper
 }
 

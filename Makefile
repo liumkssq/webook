@@ -6,3 +6,14 @@ docker:
 	@docker rmi -f flycash/webook:v0.0.1
 	@docker build -t flycash/webook:v0.0.1 .
 
+
+.PHONY: etcdctl
+etcdctl:
+	powershell -File ps/etcdctl.ps1
+
+
+
+.PHONY: docker-compose
+docker-compose:
+	docker-compose down
+	docker-compose up -d
