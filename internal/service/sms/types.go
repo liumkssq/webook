@@ -11,5 +11,7 @@ type Service interface {
 	//B()
 }
 
-type Req struct {
+type NamedArg struct {
+	Val  string
+	Name string
 }
