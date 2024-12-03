@@ -17,6 +17,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.6.0
+	github.com/lithammer/shortuuid/v4 v4.2.0
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/spf13/pflag v1.0.5

@@ -11,6 +11,7 @@ type User struct {
 	Phone    string
 	NickName string
 
+	WechatInfo WechatInfo
 	//
 	Ctime time.Time
 	//todo WeChatInfo

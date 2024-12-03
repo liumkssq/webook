@@ -16,14 +16,28 @@ type UserService interface {
 	Login(ctx context.Context, email, password string) (domain.User, error)
 	SignUp(ctx context.Context, u domain.User) error
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
-	//todo
-	//FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error)
+	FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error)
 	Profile(ctx context.Context, id int64) (domain.User, error)
 }
 
 type userService struct {
 	repo repository.UserRepository
 	//	todo log
+}
+
+func (svc *userService) FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error) {
+	u, err := svc.repo.FindByWechat(ctx, wechatInfo.OpenID)
+	if err != repository.ErrUserNotFound {
+		return u, err
+	}
+	u = domain.User{
+		WechatInfo: wechatInfo,
+	}
+	err = svc.repo.Create(ctx, u)
+	if err != nil && err != repository.ErrUserDuplicate {
+		return u, err
+	}
+	return svc.repo.FindByWechat(ctx, wechatInfo.OpenID)
 }
 
 func (svc *userService) Login(ctx context.Context, email, password string) (domain.User, error) {

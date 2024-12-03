@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ecodeclub/ekit"
 	"github.com/ecodeclub/ekit/slice"
+	mysms "github.com/liumkssq/webook/internal/service/sms"
 	"github.com/liumkssq/webook/pkg/ratelimit"
 	sms "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111"
 	"go.uber.org/zap"
@@ -17,7 +18,8 @@ type Service struct {
 	limiter  ratelimit.Limiter
 }
 
-func (s Service) Send(ctx context.Context, tplId string, args []string, numbers ...string) error {
+func (s Service) Send(ctx context.Context, biz string,
+	args []string, numbers ...string) error {
 	req := sms.NewSendSmsRequest()
 	req.SmsSdkAppId = s.appId
 	req.SignName = s.signName

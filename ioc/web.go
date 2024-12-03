@@ -18,7 +18,8 @@ import (
 )
 
 func InitWebServer(mdls []gin.HandlerFunc,
-	userHdl *web.UserHandler) *gin.Engine {
+	userHdl *web.UserHandler,
+	oauth2WechatHdl *web.OAuth2WechatHandler) *gin.Engine {
 
 	server := gin.Default()
 	server.Use(mdls...)

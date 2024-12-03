@@ -22,9 +22,8 @@ type User struct {
 
 	Phone sql.NullString `gorm:"unique"`
 
-	// 微信的字段 todo
-	//WechatUnionID sql.NullString `gorm:"type=varchar(1024)"`
-	//WechatOpenID  sql.NullString `gorm:"type=varchar(1024);unique"`
+	WechatUnionID sql.NullString `gorm:"type=varchar(1024)"`
+	WechatOpenID  sql.NullString `gorm:"type=varchar(1024);unique"`
 
 	Ctime int64
 	Utime int64
@@ -42,8 +41,7 @@ type UserDAO interface {
 	FindById(ctx context.Context, id int64) (User, error)
 	FindByPhone(ctx context.Context, phone string) (User, error)
 	Insert(ctx context.Context, u User) error
-	//todo
-	//FindByWechat(ctx context.Context, openID string) (User, error)
+	FindByWechat(ctx context.Context, openID string) (User, error)
 }
 
 type DBProvider func() *gorm.DB
@@ -59,20 +57,20 @@ func (dao *GORMUserDAO) FindByEmail(ctx context.Context, email string) (User, er
 	return u, err
 }
 
-func (dao GORMUserDAO) FindById(ctx context.Context, id int64) (User, error) {
+func (dao *GORMUserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("`id` = ?", id).First(&u).Error
 	return u, err
 }
 
-func (dao GORMUserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+func (dao *GORMUserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("phone = ?", phone).First(&u).Error
 	//err := dao.db.WithContext(ctx).First(&u, "email = ?", email).Error
 	return u, err
 }
 
-func (dao GORMUserDAO) Insert(ctx context.Context, u User) error {
+func (dao *GORMUserDAO) Insert(ctx context.Context, u User) error {
 	now := time.Now().UnixMilli()
 	u.Utime = now
 	u.Ctime = now
@@ -86,6 +84,15 @@ func (dao GORMUserDAO) Insert(ctx context.Context, u User) error {
 		}
 	}
 	return err
+}
+
+func (dao *GORMUserDAO) FindByWechat(ctx context.Context, openID string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("wechat_open_id = ?", openID).Error
+	if err != nil {
+		return u, err
+	}
+	return u, nil
 }
 
 func NewGORMUserDAO(db *gorm.DB) UserDAO {
