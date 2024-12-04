@@ -84,7 +84,7 @@ func TestService_SendSms(t *testing.T) {
 		{
 			signName: "个人学习开发自用",
 			tplCode:  "SMS_475815554",
-			phone:    []string{"15207375746"},
+			phone:    []string{""},
 		},
 	}
 	for _, tt := range tests {

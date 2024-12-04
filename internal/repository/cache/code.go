@@ -34,8 +34,11 @@ type RedisCodeCache struct {
 }
 
 func (c *RedisCodeCache) Set(ctx context.Context, biz, phone, code string) error {
+	zap.L().Debug("set code",
+		zap.String("biz", biz),
+		zap.String("phone", phone))
 	res, err := c.client.Eval(ctx, luaSetCode,
-		[]string{c.key(biz, phone), code}).Int()
+		[]string{c.key(biz, phone)}, code).Int()
 	if err != nil {
 		return err
 	}

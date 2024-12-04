@@ -27,9 +27,8 @@ type UserRepository interface {
 }
 
 type CachedUserRepository struct {
-	dao        dao.UserDAO
-	cache      cache.UserCache
-	testSignal chan struct{}
+	dao   dao.UserDAO
+	cache cache.UserCache
 }
 
 func NewCachedUserRepository(dao dao.UserDAO, cache cache.UserCache) UserRepository {
@@ -119,7 +118,6 @@ func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.U
 	//异步写入缓存
 	go func() {
 		_ = r.cache.Set(ctx, u)
-		r.testSignal <- struct{}{}
 	}()
 	return u, nil
 }
