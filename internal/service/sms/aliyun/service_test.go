@@ -2,10 +2,14 @@ package aliyun
 
 import (
 	"context"
-	openapi "github.com/alibabacloud-go/darabonba-openapi/client"
-	sms "github.com/alibabacloud-go/dysmsapi-20170525/v2/client"
+	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
+	sms "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
+	"github.com/alibabacloud-go/tea/tea"
 	"github.com/ecodeclub/ekit"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
+	"log"
+	"os"
 	"testing"
 )
 
@@ -51,17 +55,23 @@ import (
 //}
 
 func TestService_SendSms(t *testing.T) {
-
-	keyId := ""
-	keySecret := ""
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
+	keyId := os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID")
+	keySecret := os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET")
 
 	config := &openapi.Config{
 		AccessKeyId:     ekit.ToPtr[string](keyId),
 		AccessKeySecret: ekit.ToPtr[string](keySecret),
 	}
+	config.Endpoint = tea.String("dysmsapi.aliyuncs.com")
 	client, err := sms.NewClient(config)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if client == nil {
+		panic("client is nil")
 	}
 	service := NewService(client)
 
@@ -72,9 +82,9 @@ func TestService_SendSms(t *testing.T) {
 		wantErr  error
 	}{
 		{
-			signName: "",
-			tplCode:  "",
-			phone:    []string{"", ""},
+			signName: "个人学习开发自用",
+			tplCode:  "SMS_475815554",
+			phone:    []string{"15207375746"},
 		},
 	}
 	for _, tt := range tests {

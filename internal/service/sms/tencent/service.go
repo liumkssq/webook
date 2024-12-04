@@ -18,6 +18,15 @@ type Service struct {
 	limiter  ratelimit.Limiter
 }
 
+func NewService(appId *string, signName *string, client *sms.Client, limiter ratelimit.Limiter) *Service {
+	return &Service{
+		appId:    appId,
+		signName: signName,
+		client:   client,
+		limiter:  limiter,
+	}
+}
+
 func (s Service) Send(ctx context.Context, biz string,
 	args []string, numbers ...string) error {
 	req := sms.NewSendSmsRequest()
@@ -40,11 +49,10 @@ func (s Service) Send(ctx context.Context, biz string,
 	return nil
 }
 
-func NewService(appId *string, signName *string, client *sms.Client, limiter ratelimit.Limiter) *Service {
-	return &Service{appId: appId, signName: signName, client: client, limiter: limiter}
-}
-
-func (s *Service) SendV1(ctx context.Context, tplId string, args []mysms.NamedArg, numbers ...string) error {
+func (s *Service) SendV1(ctx context.Context,
+	tplId string,
+	args []mysms.NamedArg,
+	numbers ...string) error {
 	req := sms.NewSendSmsRequest()
 	req.SmsSdkAppId = s.appId
 	req.SignName = s.signName

@@ -30,7 +30,8 @@ type codeService struct {
 	//tplId string
 }
 
-func (svc *codeService) Send(ctx context.Context, biz string, phone string) error {
+func (svc *codeService) Send(ctx context.Context,
+	biz string, phone string) error {
 	code := svc.generateCode()
 	err := svc.repo.Store(ctx, biz, phone, code)
 	if err != nil {
@@ -38,12 +39,16 @@ func (svc *codeService) Send(ctx context.Context, biz string, phone string) erro
 	}
 	err = svc.smsSvc.Send(ctx, codeTplId.Load(), []string{code}, phone)
 	if err != nil {
+		// Send 短信失败，记录日志，但是不返回错误
+		//retryable
 		err = fmt.Errorf("短信服务不可用: %w", err)
 	}
 	return err
 }
 
-func (svc *codeService) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
+func (svc *codeService) Verify(ctx context.Context,
+	biz string, phone string,
+	inputCode string) (bool, error) {
 	return svc.repo.Verify(ctx, biz, phone, inputCode)
 }
 

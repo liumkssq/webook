@@ -3,7 +3,9 @@ local cntKey = key..":cnt"
 -- 用户输入的验证码
 local expectedCode = ARGV[1]
 
+-- 可重试次数
 local cnt = tonumber(redis.call("get", cntKey))
+-- 验证码
 local code = redis.call("get", key)
 
 if cnt == nil or cnt <= 0 then
@@ -12,6 +14,7 @@ if cnt == nil or cnt <= 0 then
 end
 
 if code == expectedCode then
+    -- 验证成功
     redis.call("set", cntKey, 0)
     return 0
 else
