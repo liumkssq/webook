@@ -1,1 +1,4 @@
-package repository
+package article
+
+type ArticleReaderRepository interface {
+}

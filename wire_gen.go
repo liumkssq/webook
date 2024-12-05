@@ -11,6 +11,7 @@ import (
 	"github.com/liumkssq/webook/internal/repository"
 	"github.com/liumkssq/webook/internal/repository/cache"
 	"github.com/liumkssq/webook/internal/repository/dao"
+	"github.com/liumkssq/webook/internal/repository/dao/article"
 	"github.com/liumkssq/webook/internal/service"
 	"github.com/liumkssq/webook/internal/web"
 	"github.com/liumkssq/webook/internal/web/jwt"
@@ -37,8 +38,12 @@ func InitWebServer() *gin.Engine {
 	smsService := ioc.InitSMSService(cmdable)
 	codeService := service.NewCodeService(codeRepository, smsService)
 	userHandler := web.NewUserHandler(userService, codeService, handler)
+	articleDAO := article.NewGORMArticleDAO()
+	articleRepository := repository.NewArticleRepository(articleDAO)
+	articleService := service.NewArticleService(articleRepository)
+	articleHandler := web.NewArticleHandler(articleService)
 	wechatService := ioc.InitWechatService()
 	oAuth2WechatHandler := web.NewOAuth2WechatHandler(wechatService, userService, handler)
-	engine := ioc.InitWebServer(v, userHandler, oAuth2WechatHandler)
+	engine := ioc.InitWebServer(v, userHandler, articleHandler, oAuth2WechatHandler)
 	return engine
 }

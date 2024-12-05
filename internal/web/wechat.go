@@ -62,6 +62,7 @@ func (h *OAuth2WechatHandler) AuthURL(ctx *gin.Context) {
 		})
 		return
 	}
+	// get the url
 	ctx.JSON(http.StatusOK, Result{
 		Data: url,
 	})

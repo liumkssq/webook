@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 	"github.com/liumkssq/webook/internal/service/sms"
-	"log"
+	"go.uber.org/zap"
 	"sync/atomic"
 )
 
 type FailoverSMSService struct {
+	// 多个服务
 	svcs []sms.Service
-
-	idx uint64
+	idx  uint64
 }
 
 func NewFailoverSMSService(svcs []sms.Service) sms.Service {
@@ -29,7 +29,11 @@ func (f *FailoverSMSService) Send(ctx context.Context, tpl string, args []string
 		}
 		// 正常这边，输出日志
 		// 要做好监控
-		log.Println(err)
+		zap.L().Error("短信发送失败",
+			zap.Error(err),
+			zap.String("tpl", tpl),
+			zap.Strings("args", args),
+			zap.Strings("numbers", numbers))
 	}
 	return errors.New("全部服务商都失败了")
 }

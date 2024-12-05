@@ -27,8 +27,15 @@ func NewService(appId *string, signName *string, client *sms.Client, limiter rat
 	}
 }
 
-func (s Service) Send(ctx context.Context, biz string,
+func (s *Service) Send(ctx context.Context, biz string,
 	args []string, numbers ...string) error {
+	limited, err := s.limiter.Limit(ctx, "sms:tencent")
+	if err != nil {
+		return fmt.Errorf("短信服务判断是否限流出现问题，%w", err)
+	}
+	if limited {
+		return fmt.Errorf("短信服务限流，请稍后再试")
+	}
 	req := sms.NewSendSmsRequest()
 	req.SmsSdkAppId = s.appId
 	req.SignName = s.signName

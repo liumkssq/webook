@@ -8,7 +8,7 @@ import (
 
 func InitWechatService() wechat.Service {
 	//todo
-	return nil
+	//return nil
 	appId, ok := os.LookupEnv("WECHAT_APP_ID")
 	if !ok {
 		zap.L().Fatal("没有找到环境变量 WECHAT_APP_ID")
