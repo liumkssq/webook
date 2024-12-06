@@ -51,7 +51,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			server := gin.Default()
-			h := NewArticleHandler(tc.mock(ctrl))
+			h := NewArticleHandler(tc.mock(ctrl), nil)
 			require.NotNil(t, h, "NewUserHandler")
 			h.RegisterRoutes(server)
 			server.Use(func(ctx *gin.Context) {

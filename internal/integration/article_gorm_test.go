@@ -21,7 +21,7 @@ func (s *ArticleTestSuite) SetupSuite() {
 	dao := article.NewGORMArticleDAO()
 	repo := article2.NewArticleRepository(dao)
 	svc := service.NewArticleService(repo)
-	artHdl := web.NewArticleHandler(svc)
+	artHdl := web.NewArticleHandler(svc, nil)
 	artHdl.RegisterRoutes(s.server)
 }
 
