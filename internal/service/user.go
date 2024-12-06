@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/liumkssq/webook/internal/domain"
 	"github.com/liumkssq/webook/internal/repository"
-	"go.uber.org/zap"
+	"github.com/liumkssq/webook/pkg/logger"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -22,7 +22,7 @@ type UserService interface {
 
 type userService struct {
 	repo repository.UserRepository
-	//	todo log
+	l    logger.LoggerV1
 }
 
 func (svc *userService) FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error) {
@@ -70,7 +70,7 @@ func (svc *userService) FindOrCreate(ctx context.Context, phone string) (domain.
 	if err != repository.ErrUserNotFound {
 		return u, err
 	}
-	zap.L().Info("用户不存在，自动创建新用户")
+	svc.l.Info("用户不存在，自动创建", logger.String("phone", phone))
 	u = domain.User{
 		Phone: phone,
 	}
@@ -86,6 +86,9 @@ func (svc *userService) Profile(ctx context.Context, id int64) (domain.User, err
 	return svc.repo.FindById(ctx, id)
 }
 
-func NewUserService(repo repository.UserRepository) UserService {
-	return &userService{repo: repo}
+func NewUserService(repo repository.UserRepository, l logger.LoggerV1) UserService {
+	return &userService{
+		repo: repo,
+		l:    l,
+	}
 }

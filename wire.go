@@ -9,7 +9,7 @@ import (
 	article2 "github.com/liumkssq/webook/internal/repository/article"
 	"github.com/liumkssq/webook/internal/repository/cache"
 	"github.com/liumkssq/webook/internal/repository/dao"
-	"github.com/liumkssq/webook/internal/repository/dao/article"
+	artdao "github.com/liumkssq/webook/internal/repository/dao/article"
 	"github.com/liumkssq/webook/internal/service"
 	"github.com/liumkssq/webook/internal/web"
 	ijwt "github.com/liumkssq/webook/internal/web/jwt"
@@ -18,10 +18,11 @@ import (
 
 func InitWebServer() *gin.Engine {
 	wire.Build(
+		ioc.InitLogger,
 		ioc.InitDB,
 		ioc.InitRedis,
 		//dao
-		article.NewGORMArticleDAO,
+		artdao.NewGORMArticleDAO,
 		dao.NewGORMUserDAO,
 		cache.NewRedisUserCache,
 		cache.NewRedisCodeCache,
@@ -31,7 +32,7 @@ func InitWebServer() *gin.Engine {
 		repository.NewCachedCodeRepository,
 
 		//svc
-		service.NewArticleService,
+		service.NewArticleServiceV1,
 		service.NewUserService,
 		service.NewCodeService,
 

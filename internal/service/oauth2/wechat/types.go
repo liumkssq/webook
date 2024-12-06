@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/liumkssq/webook/internal/domain"
-	"go.uber.org/zap"
+	"github.com/liumkssq/webook/pkg/logger"
 	"net/http"
 	"net/url"
 )
@@ -22,13 +22,15 @@ type service struct {
 	appSecret string
 	client    *http.Client
 	//cmd       redis.Cmdable
+	l logger.LoggerV1
 }
 
-func NewService(appId string, appSecret string) Service {
+func NewService(appId string, appSecret string, l logger.LoggerV1) Service {
 	return &service{
 		appId:     appId,
 		appSecret: appSecret,
 		client:    http.DefaultClient,
+		l:         l,
 	}
 }
 
@@ -61,11 +63,10 @@ func (s *service) VerifyCode(ctx context.Context, code string) (domain.WechatInf
 		return domain.WechatInfo{}, err
 	}
 	if res.ErrCode != 0 {
-		zap.L().Error("code 错误")
+		s.l.Info("微信返回错误", logger.Error(err))
 		return domain.WechatInfo{}, fmt.Errorf("code 错误，%s", res.ErrMsg)
 	}
-	zap.L().Info("调用微信，拿到用户信息",
-		zap.String("unionID", res.UnionID), zap.String("openID", res.OpenID))
+	s.l.Info("微信返回结果", logger.String("res", fmt.Sprintf("%+v", res)))
 
 	return domain.WechatInfo{
 		OpenID:  res.OpenID,

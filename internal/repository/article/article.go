@@ -2,6 +2,7 @@ package article
 
 import (
 	"context"
+	"github.com/gin-gonic/gin"
 	"github.com/liumkssq/webook/internal/domain"
 	dao "github.com/liumkssq/webook/internal/repository/dao/article"
 )
@@ -11,6 +12,7 @@ type ArticleRepository interface {
 	Update(ctx context.Context, art domain.Article) error
 	FindById(id int64) domain.Article
 	Sync(ctx context.Context, art domain.Article) (int64, error)
+	SyncStatus(ctx *gin.Context, id int64, author int64, status domain.ArticleStatus) error
 }
 
 type CachedArticleRepository struct {
@@ -18,6 +20,11 @@ type CachedArticleRepository struct {
 
 	readerDAO dao.ReaderDAO
 	authorDAO dao.AuthorDAO
+}
+
+func (c *CachedArticleRepository) SyncStatus(ctx *gin.Context, id int64, author int64, status domain.ArticleStatus) error {
+	//TODO implement me
+	return c.dao.SyncStatus(ctx, id, author, uint8(status))
 }
 
 func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {

@@ -2,13 +2,16 @@ package service
 
 import (
 	"context"
+	"github.com/gin-gonic/gin"
 	"github.com/liumkssq/webook/internal/domain"
 	"github.com/liumkssq/webook/internal/repository/article"
+	"github.com/liumkssq/webook/pkg/logger"
 )
 
 type ArticleService interface {
 	Save(ctx context.Context, art domain.Article) (int64, error)
 	Publish(ctx context.Context, art domain.Article) (int64, error)
+	Withdraw(ctx *gin.Context, d domain.Article) error
 }
 type articleService struct {
 	repo article.ArticleRepository
@@ -16,6 +19,11 @@ type articleService struct {
 	//v1
 	author article.ArticleAuthorRepository
 	reader article.ArticleReaderRepository
+	l      logger.LoggerV1
+}
+
+func (a *articleService) Withdraw(ctx *gin.Context, art domain.Article) error {
+	return a.repo.SyncStatus(ctx, art.Id, art.Author.Id, domain.ArticleStatusPrivate)
 }
 
 func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
@@ -31,9 +39,19 @@ func (a *articleService) PublishV1(ctx context.Context, art domain.Article) (int
 	return 0, nil
 }
 
-func NewArticleService(repo article.ArticleRepository) ArticleService {
+func NewArticleServiceV1(repo article.ArticleRepository) ArticleService {
 	return &articleService{
 		repo: repo,
+	}
+}
+
+func NewArticleService(author article.ArticleAuthorRepository,
+	reader article.ArticleReaderRepository,
+	l logger.LoggerV1) ArticleService {
+	return &articleService{
+		author: author,
+		reader: reader,
+		l:      l,
 	}
 }
 
