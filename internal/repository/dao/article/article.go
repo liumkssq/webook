@@ -10,10 +10,16 @@ import (
 type ArticleDAO interface {
 	Insert(ctx context.Context, art Article) (int64, error)
 	UpdateById(ctx context.Context, article Article) error
+	UpdateOrInsert(ctx context.Context, entity Article) error
 }
 
 type GORMArticleDAO struct {
 	db *gorm.DB
+}
+
+func (dao *GORMArticleDAO) UpdateOrInsert(ctx context.Context, entity Article) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (dao *GORMArticleDAO) Insert(ctx context.Context, art Article) (int64, error) {

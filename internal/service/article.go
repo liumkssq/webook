@@ -19,13 +19,16 @@ type articleService struct {
 }
 
 func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
-	id, err := a.repo.Create(ctx, art)
-
+	id, err := a.repo.Sync(ctx, art)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 func (a *articleService) PublishV1(ctx context.Context, art domain.Article) (int64, error) {
-	id, err := a.repo.Create(ctx, art)
-
+	//todo
+	return 0, nil
 }
 
 func NewArticleService(repo article.ArticleRepository) ArticleService {
