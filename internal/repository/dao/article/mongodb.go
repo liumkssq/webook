@@ -2,6 +2,7 @@ package article
 
 import (
 	"context"
+	"errors"
 	"github.com/bwmarrin/snowflake"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,13 +26,31 @@ type MongoDBDAO struct {
 type IDGenerator func() int64
 
 func (m MongoDBDAO) Insert(ctx context.Context, art Article) (int64, error) {
-	//TODO implement me
-	panic("implement me")
+	now := time.Now().UnixMilli()
+	art.Ctime = now
+	art.Utime = now
+	id := m.node.Generate().Int64()
+	art.Id = id
+	_, err := m.col.InsertOne(ctx, art)
+	return id, err
 }
 
 func (m MongoDBDAO) UpdateById(ctx context.Context, art Article) error {
-	//TODO implement me
-	panic("implement me")
+	filter := bson.M{"id": art.Id, "author_id": art.AuthorId}
+	update := bson.D{bson.E{"$set", bson.M{
+		"title":   art.Title,
+		"content": art.Content,
+		"utime":   time.Now().UnixMilli(),
+		"status":  art.Status,
+	}}}
+	res, err := m.col.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	if res.ModifiedCount == 0 {
+		return errors.New("没有修改任何数据")
+	}
+	return nil
 }
 
 func (m MongoDBDAO) GetByAuthor(ctx context.Context, author int64, offset, limit int) ([]Article, error) {
