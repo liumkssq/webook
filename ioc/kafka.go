@@ -32,11 +32,8 @@ func NewSyncProducer(client sarama.Client) sarama.SyncProducer {
 	}
 	return res
 }
-func NewConsumers(c1 *article.KafkaConsumer) []events.Consumer {
-	return []events.Consumer{c1}
-}
 
 // NewConsumers 面临的问题依旧是所有的 Consumer 在这里注册一下
-//func NewConsumers(c1 *article.InteractiveReadEventBatchConsumer) []events.Consumer {
-//	return []events.Consumer{c1}
-//}
+func NewConsumers(c1 *article.InteractiveReadEventConsumer) []events.Consumer {
+	return []events.Consumer{c1}
+}

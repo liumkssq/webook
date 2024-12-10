@@ -5,10 +5,11 @@ import (
 	"gorm.io/gorm"
 )
 
-func InitTable(db *gorm.DB) error {
-	return db.AutoMigrate(&User{},
-		&article.Article{},
+func InitTables(db *gorm.DB) error {
+	return db.AutoMigrate(&User{}, &article.Article{},
 		&article.PublishedArticle{},
+		&article.PublishedArticleV1{},
+		&AsyncSms{},
 		&Interactive{},
 		&UserLikeBiz{},
 		&Collection{},

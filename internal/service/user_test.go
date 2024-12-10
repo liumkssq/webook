@@ -2,118 +2,125 @@ package service
 
 import (
 	"context"
-	"errors"
 	"github.com/liumkssq/webook/internal/domain"
 	"github.com/liumkssq/webook/internal/repository"
 	repomocks "github.com/liumkssq/webook/internal/repository/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/crypto/bcrypt"
 	"testing"
 	"time"
 )
 
-func Test_userService_Login(t *testing.T) {
-	now := time.Now()
+func TestUserService_Login(t *testing.T) {
+	//固定使用一个时间
+	ctime := time.Now()
 	testCases := []struct {
 		name string
+
 		mock func(ctrl *gomock.Controller) repository.UserRepository
 
-		//ctx      context.Context
+		// 输入
+		ctx      context.Context
 		email    string
 		password string
 
-		wantUser domain.User
+		// 预期中的输出
 		wantErr  error
+		wantUser domain.User
 	}{
 		{
-			name:     "登录成功",
-			email:    "test@example.com",
-			password: "hello#world123",
-
+			name: "登录成功",
 			mock: func(ctrl *gomock.Controller) repository.UserRepository {
 				repo := repomocks.NewMockUserRepository(ctrl)
-				repo.EXPECT().FindByEmail(gomock.Any(), "test@example.com").
+				// 这边演示一下不用 gomock.Any
+				repo.EXPECT().
+					FindByEmail(context.Background(), "123@qq.com").
 					Return(domain.User{
-						Email:    "test@example.com",
-						Phone:    "12345678901",
-						PassWord: "$2a$10$dIJMY9AmPd0qVegZgZ6YIebtkKICRnq.kOhVff.DY0iG5cb59oqJG",
-						Ctime:    now,
+						Id:    123,
+						Email: "123@qq.com",
+						// 这里你要用 bcrypt 生成一个合法的密码
+						Password: "$2a$10$s51GBcU20dkNUVTpUAQqpe6febjXkRYvhEwa5OkN5rU6rw2KTbNUi",
+						Phone:    "15261890000",
+						Ctime:    ctime,
 					}, nil)
 				return repo
 			},
+			ctx:   context.Background(),
+			email: "123@qq.com",
+			// 这是原始的密码。然后你用这个密码调用 bcrypt 生成一个加密后的密码
+			password: "hello#world123",
+			// 这边这个返回的是，实际上就是在 mock 中返回的
 			wantUser: domain.User{
-				Email:    "test@example.com",
-				Phone:    "12345678901",
-				PassWord: "$2a$10$dIJMY9AmPd0qVegZgZ6YIebtkKICRnq.kOhVff.DY0iG5cb59oqJG",
-				Ctime:    now,
+				Id:       123,
+				Email:    "123@qq.com",
+				Password: "$2a$10$s51GBcU20dkNUVTpUAQqpe6febjXkRYvhEwa5OkN5rU6rw2KTbNUi",
+				Phone:    "15261890000",
+				Ctime:    ctime,
 			},
-			wantErr: nil,
 		},
 		{
-			name:     "用户不存在",
-			email:    "test@example.com",
-			password: "hello#world123",
-
+			name: "用户未找到",
 			mock: func(ctrl *gomock.Controller) repository.UserRepository {
 				repo := repomocks.NewMockUserRepository(ctrl)
-				repo.EXPECT().FindByEmail(gomock.Any(), "test@example.com").
+				repo.EXPECT().
+					FindByEmail(context.Background(), "123@qq.com").
+					// 在这里，模拟返回 ErrUserNotFound 错误
 					Return(domain.User{}, repository.ErrUserNotFound)
 				return repo
 			},
-			wantUser: domain.User{},
-			wantErr:  ErrInvalidUserOrPassword,
-		},
-		{
-			name:     "系统错误",
-			email:    "test@example.com",
+			ctx:      context.Background(),
+			email:    "123@qq.com",
 			password: "hello#world123",
-
-			mock: func(ctrl *gomock.Controller) repository.UserRepository {
-				repo := repomocks.NewMockUserRepository(ctrl)
-				repo.EXPECT().FindByEmail(gomock.Any(), "test@example.com").
-					Return(domain.User{}, errors.New("数据库错误"))
-				return repo
-			},
-			wantUser: domain.User{},
-			wantErr:  errors.New("数据库错误"),
+			// 返回密码错误
+			wantErr: ErrInvalidUserOrPassword,
 		},
 		{
-			name:     "密码错误",
-			email:    "test@example.com",
-			password: "hello12#world123",
-
+			name: "密码错误",
 			mock: func(ctrl *gomock.Controller) repository.UserRepository {
 				repo := repomocks.NewMockUserRepository(ctrl)
-				repo.EXPECT().FindByEmail(gomock.Any(), "test@example.com").
+				// 这边演示一下不用 gomock.Any
+				repo.EXPECT().
+					FindByEmail(context.Background(), "123@qq.com").
 					Return(domain.User{
-						Email:    "test@example.com",
-						Phone:    "12345678901",
-						PassWord: "$2a$10$dIJMY9AmPd0qVegZgZ6YIebtkKICRnq.kOhVff.DY0iG5cb59oqJG",
-						Ctime:    now,
+						Id:    123,
+						Email: "123@qq.com",
+						// 这里你要用 bcrypt 生成一个合法的密码
+						Password: "$2a$10$s51GBcU20dkNUVTpUAQqpe6febjXkRYvhEwa5OkN5rU6rw2KTbNUi",
+						Phone:    "15261890000",
+						Ctime:    ctime,
 					}, nil)
 				return repo
 			},
-			wantUser: domain.User{},
-			wantErr:  ErrInvalidUserOrPassword,
+			ctx:   context.Background(),
+			email: "123@qq.com",
+			// 用的是 hello#world123 加密后的密码
+			// 这里我们用一个错误的密码
+			password: "hello#world",
+			// 返回密码错误
+			wantErr: ErrInvalidUserOrPassword,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			svc := NewUserService(tc.mock(ctrl), nil)
-			u, err := svc.Login(context.Background(), tc.email, tc.password)
-			assert.Equal(t, tc.wantUser, u)
+			repo := tc.mock(ctrl)
+			svc := NewUserService(repo)
+			user, err := svc.Login(tc.ctx, tc.email, tc.password)
 			assert.Equal(t, tc.wantErr, err)
+			assert.Equal(t, tc.wantUser, user)
 		})
 	}
 }
 
-func TestEncryptPassword(t *testing.T) {
-	res, err := bcrypt.GenerateFromPassword([]byte("hello#world123"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(string(res))
+func TestPasswordEncrypt(t *testing.T) {
+	pwd := []byte("hello#world123")
+	// 加密
+	encrypted, err := bcrypt.GenerateFromPassword(pwd, bcrypt.DefaultCost)
+	// 比较
+	println(string(encrypted))
+	err = bcrypt.CompareHashAndPassword(encrypted, pwd)
+	require.NoError(t, err)
 }

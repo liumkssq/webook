@@ -87,18 +87,18 @@ func (mr *MockUserDAOMockRecorder) FindByPhone(ctx, phone any) *gomock.Call {
 }
 
 // FindByWechat mocks base method.
-func (m *MockUserDAO) FindByWechat(ctx context.Context, openID string) (dao.User, error) {
+func (m *MockUserDAO) FindByWechat(ctx context.Context, openId string) (dao.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByWechat", ctx, openID)
+	ret := m.ctrl.Call(m, "FindByWechat", ctx, openId)
 	ret0, _ := ret[0].(dao.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindByWechat indicates an expected call of FindByWechat.
-func (mr *MockUserDAOMockRecorder) FindByWechat(ctx, openID any) *gomock.Call {
+func (mr *MockUserDAOMockRecorder) FindByWechat(ctx, openId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByWechat", reflect.TypeOf((*MockUserDAO)(nil).FindByWechat), ctx, openID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByWechat", reflect.TypeOf((*MockUserDAO)(nil).FindByWechat), ctx, openId)
 }
 
 // Insert mocks base method.
@@ -113,4 +113,18 @@ func (m *MockUserDAO) Insert(ctx context.Context, u dao.User) error {
 func (mr *MockUserDAOMockRecorder) Insert(ctx, u any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*MockUserDAO)(nil).Insert), ctx, u)
+}
+
+// UpdateNonZeroFields mocks base method.
+func (m *MockUserDAO) UpdateNonZeroFields(ctx context.Context, u dao.User) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNonZeroFields", ctx, u)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateNonZeroFields indicates an expected call of UpdateNonZeroFields.
+func (mr *MockUserDAOMockRecorder) UpdateNonZeroFields(ctx, u any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNonZeroFields", reflect.TypeOf((*MockUserDAO)(nil).UpdateNonZeroFields), ctx, u)
 }

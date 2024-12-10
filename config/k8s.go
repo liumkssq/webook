@@ -2,11 +2,13 @@
 
 package config
 
-var Config = config{
+var Config = WebookConfig{
 	DB: DBConfig{
-		DSN: "root:root@tcp(webook-record-mysql:3308)/webook",
+		DSN: "root:root@tcp(webook-mysql:3308)/webook",
 	},
 	Redis: RedisConfig{
-		Addr: "webook-record-redis:6379",
+		Addr:     "webook-redis:6379",
+		Password: "",
+		DB:       1,
 	},
 }

@@ -58,8 +58,7 @@ func (dao *GORMArticleDAO) SyncStatus(ctx context.Context, author, id int64, sta
 		}
 
 		res = tx.Model(&PublishedArticle{}).
-			Where("id=? AND author_id = ?", id, author).
-			Update("status", status)
+			Where("id=? AND author_id = ?", id, author).Update("status", status)
 		if res.Error != nil {
 			return res.Error
 		}
@@ -149,7 +148,6 @@ func (dao *GORMArticleDAO) Insert(ctx context.Context,
 	art.Ctime = now
 	art.Utime = now
 	err := dao.db.WithContext(ctx).Create(&art).Error
-	// 返回自增主键
 	return art.Id, err
 }
 

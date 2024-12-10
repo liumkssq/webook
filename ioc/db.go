@@ -1,38 +1,38 @@
 package ioc
 
 import (
+	"fmt"
 	"github.com/liumkssq/webook/internal/repository/dao"
 	"github.com/liumkssq/webook/pkg/logger"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	glogger "gorm.io/gorm/logger"
-	"time"
 )
 
 func InitDB(l logger.LoggerV1) *gorm.DB {
 	type Config struct {
 		DSN string `yaml:"dsn"`
 	}
-	var cfg = Config{
-		DSN: "root:root@tcp(localhost:13316)/webook_default",
+	c := Config{
+		DSN: "root:root@tcp(localhost:13316)/webook",
 	}
-	//var cfg Config
-	err := viper.UnmarshalKey("db", &cfg)
-	//fmt.Println(cfg.DSN)
-	db, err := gorm.Open(mysql.Open(cfg.DSN), &gorm.Config{
-		//设置数据库慢查询日志
-		Logger: glogger.New(gormLoggerFunc(l.Debug), glogger.Config{
-			SlowThreshold:             time.Millisecond * 500,
-			IgnoreRecordNotFoundError: true,
-			ParameterizedQueries:      true,
-			LogLevel:                  glogger.Info,
-		}),
+	err := viper.UnmarshalKey("db", &c)
+	if err != nil {
+		panic(fmt.Errorf("初始化配置失败 %v, 原因 %w", c, err))
+	}
+	db, err := gorm.Open(mysql.Open(c.DSN), &gorm.Config{
+		// 使用 DEBUG 来打印
+		Logger: glogger.New(gormLoggerFunc(l.Debug),
+			glogger.Config{
+				SlowThreshold: 0,
+				LogLevel:      glogger.Info,
+			}),
 	})
 	if err != nil {
 		panic(err)
 	}
-	err = dao.InitTable(db)
+	err = dao.InitTables(db)
 	if err != nil {
 		panic(err)
 	}
@@ -43,14 +43,4 @@ type gormLoggerFunc func(msg string, fields ...logger.Field)
 
 func (g gormLoggerFunc) Printf(msg string, args ...interface{}) {
 	g(msg, logger.Field{Key: "args", Value: args})
-}
-
-type DoSomething interface {
-	DoABC() string
-}
-
-type DoSomethingFunc func() string
-
-func (d DoSomethingFunc) DoABC() string {
-	return d()
 }

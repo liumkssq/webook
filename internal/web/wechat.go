@@ -10,103 +10,66 @@ import (
 	"github.com/liumkssq/webook/internal/service/oauth2/wechat"
 	ijwt "github.com/liumkssq/webook/internal/web/jwt"
 	"net/http"
-	"time"
 )
 
+var _ handler = (*OAuth2WechatHandler)(nil)
+
 type OAuth2WechatHandler struct {
-	svc     wechat.Service
-	userSvc service.UserService
+	// 这边也可以直接定义成 wechat.Service
+	// 但是为了保持使用 mock 来测试，这里还是用了接口
+	wechatSvc       wechat.Service
+	userSvc         service.UserService
+	stateCookieName string
+	stateTokenKey   []byte
 	ijwt.Handler
-	stateKey []byte
-	//cfg      WechatHandlerConfig
 }
 
-//type WechatHandlerConfig struct {
-//	Secure bool
-//	//StateKey
-//}
-
-func NewOAuth2WechatHandler(svc wechat.Service,
+func NewOAuth2WechatHandler(service wechat.Service,
 	userSvc service.UserService,
-	jwtHdl ijwt.Handler) *OAuth2WechatHandler {
+	jwthdl ijwt.Handler) *OAuth2WechatHandler {
 	return &OAuth2WechatHandler{
-		svc:      svc,
-		userSvc:  userSvc,
-		Handler:  jwtHdl,
-		stateKey: []byte("95osj3fUD7foxmlYdDbncXz4VD2igvf1"),
-		//cfg:      cfg,
+		wechatSvc: service,
+		userSvc:   userSvc,
+		// 万一后续我们要改，也可以做成可配置的。
+		stateCookieName: "jwt-state",
+		stateTokenKey:   []byte("moyn8y9abnd7q4zkq2m73yw8tu9j5ixB"),
+		Handler:         jwthdl,
 	}
 }
 
-func (h *OAuth2WechatHandler) RegisterRoutes(server *gin.Engine) {
-	g := server.Group("/oauth2/wechat")
-	g.GET("/authurl", h.AuthURL)
+func (h *OAuth2WechatHandler) RegisterRoutes(s *gin.Engine) {
+	g := s.Group("/oauth2/wechat")
+	g.GET("/authurl", h.OAuth2URL)
+	// 这边用 Any 万无一失
 	g.Any("/callback", h.Callback)
 }
 
-func (h *OAuth2WechatHandler) AuthURL(ctx *gin.Context) {
-	state := uuid.New()
-	url, err := h.svc.AuthURL(ctx, state)
-	// 要把我的 state 存好
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "构造扫码登录URL失败",
-		})
-		return
-	}
-	if err = h.setStateCookie(ctx, state); err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统异常",
-		})
-		return
-	}
-	// get the url
-	ctx.JSON(http.StatusOK, Result{
-		Data: url,
-	})
-}
-
-func (h *OAuth2WechatHandler) setStateCookie(ctx *gin.Context, state string) error {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, StateClaims{
-		State: state,
-		RegisteredClaims: jwt.RegisteredClaims{
-			// 过期时间，你预期中一个用户完成登录的时间
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 10)),
-		},
-	})
-	tokenStr, err := token.SignedString(h.stateKey)
-	if err != nil {
-		return err
-	}
-	ctx.SetCookie("jwt-state", tokenStr,
-		600, "/oauth2/wechat/callback",
-		// 线上把 secure 做成 true
-		"", false, true)
-	return nil
-}
-
 func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
-	code := ctx.Query("code")
+	// 验证 state
 	err := h.verifyState(ctx)
 	if err != nil {
+		// 实际上，但凡进来这里，就说明有人搞你，
+		// 因此这边要做好监控和告警
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
-			Msg:  "登录失败",
+			Msg:  "系统异常，请重试",
 		})
 		return
 	}
-	info, err := h.svc.VerifyCode(ctx, code)
+
+	code := ctx.Query("code")
+	info, err := h.wechatSvc.VerifyCode(ctx, code)
 	if err != nil {
+		// 实际上这个错误，也有可能是 code 不对
+		// 但是给前端的信息没有太大的必要区分究竟是代码不对还是系统本身有问题
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
 		return
 	}
-	// 这里怎么办？
-	// 从 userService 里面拿 uid
+	// 这里就是登录成功
+	// 所以你需要设置 JWT
 	u, err := h.userSvc.FindOrCreateByWechat(ctx, info)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
@@ -115,7 +78,6 @@ func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 		})
 		return
 	}
-
 	err = h.SetLoginToken(ctx, u.Id)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
@@ -124,32 +86,71 @@ func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 		})
 		return
 	}
-
 	ctx.JSON(http.StatusOK, Result{
-		Msg: "OK",
+		Msg: "登录成功",
 	})
-	// 验证微信的 code
 }
 
 func (h *OAuth2WechatHandler) verifyState(ctx *gin.Context) error {
 	state := ctx.Query("state")
-	// 校验一下我的 state
-	ck, err := ctx.Cookie("jwt-state")
+	ck, err := ctx.Cookie(h.stateCookieName)
 	if err != nil {
-		return fmt.Errorf("拿不到 state 的 cookie, %w", err)
+		// 基本上，如果进来这里，就可以认为是有人在搞鬼。
+		return fmt.Errorf("%w, 无法获得 cookie", err)
 	}
-
 	var sc StateClaims
-	token, err := jwt.ParseWithClaims(ck, &sc, func(token *jwt.Token) (interface{}, error) {
-		return h.stateKey, nil
+	_, err = jwt.ParseWithClaims(ck, &sc, func(token *jwt.Token) (interface{}, error) {
+		return h.stateTokenKey, nil
 	})
-	if err != nil || !token.Valid {
-		return fmt.Errorf("token 已经过期了, %w", err)
+	if err != nil {
+		return fmt.Errorf("%w, cookie 不是合法 JWT token", err)
 	}
-
 	if sc.State != state {
-		return errors.New("state 不相等")
+		return errors.New("state 被篡改了")
 	}
+	return nil
+}
+
+func (h *OAuth2WechatHandler) OAuth2URL(ctx *gin.Context) {
+	state := uuid.New()
+	url, err := h.wechatSvc.AuthURL(ctx, state)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误，请稍后再试",
+		})
+		return
+	}
+	err = h.setStateCookie(ctx, state)
+	if err != nil {
+		// 理论上你也可以考虑忽略这个错误，不影响扫码登录
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误，请稍后再试",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Data: url,
+	})
+	return
+}
+
+// setStateCookie 只有微信这里用，所以定义在这里
+func (h *OAuth2WechatHandler) setStateCookie(ctx *gin.Context, state string) error {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, StateClaims{
+		State: state,
+	})
+	tokenStr, err := token.SignedString(h.stateTokenKey)
+	if err != nil {
+		return err
+	}
+	ctx.SetCookie("jwt-state", tokenStr,
+		600,
+		// 限制在只能在这里生效。
+		"/oauth2/wechat/callback",
+		// 这边把 HTTPS 协议禁止了。不过在生产环境中要开启。
+		"", false, true)
 	return nil
 }
 

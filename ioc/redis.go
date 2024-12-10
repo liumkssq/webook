@@ -6,9 +6,9 @@ import (
 )
 
 func InitRedis() redis.Cmdable {
-	addr := viper.GetString("redis.addr")
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: addr,
+	// 这里演示读取特定的某个字段
+	cmd := redis.NewClient(&redis.Options{
+		Addr: viper.GetString("redis.addr"),
 	})
-	return redisClient
+	return cmd
 }

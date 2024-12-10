@@ -3,29 +3,23 @@ package jwt
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/liumkssq/webook/pkg/ginx"
 )
 
+//go:generate mockgen -source=./types.go -package=jwtmocks -destination=./mocks/handler.mock.go Handler
 type Handler interface {
-	SetLoginToken(ctx *gin.Context, uid int64) error
-	SetJWTToken(ctx *gin.Context, uid int64, ssid string) error
 	ClearToken(ctx *gin.Context) error
+	SetLoginToken(ctx *gin.Context, uid int64) error
+	SetJWTToken(ctx *gin.Context, ssid string, uid int64) error
 	CheckSession(ctx *gin.Context, ssid string) error
-	ExtractToken(ctx *gin.Context) string
+	ExtractTokenString(ctx *gin.Context) string
 }
 
 type RefreshClaims struct {
-	// Uid 用户唯一标识
-	Uid int64
-	//Ssid 登录唯一标识
+	Id   int64
 	Ssid string
 	jwt.RegisteredClaims
 }
 
-type UserClaims struct {
-	jwt.RegisteredClaims
-	// 声明你自己的要放进去 token 里面的数据
-	Id   int64
-	Ssid string
-	// 自己随便加
-	UserAgent string
-}
+// UserClaims 别名机制，偷个懒，这样就不用修改其它的代码了
+type UserClaims = ginx.UserClaims

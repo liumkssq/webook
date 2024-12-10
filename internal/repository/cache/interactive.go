@@ -31,7 +31,6 @@ type InteractiveCache interface {
 		biz string, bizId int64) error
 	DecrLikeCntIfPresent(ctx context.Context,
 		biz string, bizId int64) error
-	// 增加收藏数
 	IncrCollectCntIfPresent(ctx context.Context, biz string, bizId int64) error
 	// Get 查询缓存中数据
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
@@ -43,31 +42,37 @@ type RedisInteractiveCache struct {
 	expiration time.Duration
 }
 
-func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context, biz string, bizId int64) error {
-	return r.client.Eval(ctx, luaIncrCnt,
-		[]string{r.key(biz, bizId)},
-		fieldReadCnt, 1).Err()
-}
-
-func (r *RedisInteractiveCache) IncrLikeCntIfPresent(ctx context.Context, biz string, bizId int64) error {
-	return r.client.Eval(ctx, luaIncrCnt,
-		[]string{r.key(biz, bizId)},
-		fieldLikeCnt, 1).Err()
-}
-
-func (r *RedisInteractiveCache) DecrLikeCntIfPresent(ctx context.Context, biz string, bizId int64) error {
-	return r.client.Eval(ctx, luaIncrCnt,
-		[]string{r.key(biz, bizId)},
-		fieldLikeCnt, -1).Err()
-}
-
-func (r *RedisInteractiveCache) IncrCollectCntIfPresent(ctx context.Context, biz string, bizId int64) error {
+func (r *RedisInteractiveCache) IncrCollectCntIfPresent(ctx context.Context,
+	biz string, bizId int64) error {
 	return r.client.Eval(ctx, luaIncrCnt,
 		[]string{r.key(biz, bizId)},
 		fieldCollectCnt, 1).Err()
 }
 
-func (r *RedisInteractiveCache) Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error) {
+func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context,
+	biz string, bizId int64) error {
+	return r.client.Eval(ctx, luaIncrCnt,
+		[]string{r.key(biz, bizId)},
+		fieldReadCnt, 1).Err()
+}
+
+func (r *RedisInteractiveCache) IncrLikeCntIfPresent(ctx context.Context,
+	biz string, bizId int64) error {
+	return r.client.Eval(ctx, luaIncrCnt,
+		[]string{r.key(biz, bizId)},
+		fieldLikeCnt, 1).Err()
+}
+
+func (r *RedisInteractiveCache) DecrLikeCntIfPresent(ctx context.Context,
+	biz string, bizId int64) error {
+	return r.client.Eval(ctx, luaIncrCnt,
+		[]string{r.key(biz, bizId)},
+		fieldLikeCnt, -1).Err()
+}
+
+func (r *RedisInteractiveCache) Get(ctx context.Context,
+	biz string, bizId int64) (domain.Interactive, error) {
+	// 直接使用 HMGet，即便缓存中没有对应的 key，也不会返回 error
 	data, err := r.client.HGetAll(ctx, r.key(biz, bizId)).Result()
 	if err != nil {
 		return domain.Interactive{}, err

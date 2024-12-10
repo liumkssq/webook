@@ -2,197 +2,103 @@ package web
 
 import (
 	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/liumkssq/webook/internal/domain"
 	"github.com/liumkssq/webook/internal/service"
 	ijwt "github.com/liumkssq/webook/internal/web/jwt"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"net/http"
+	"time"
 )
 
-const biz = "login"
+const (
+	emailRegexPattern = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
+	// 和上面比起来，用 ` 看起来就比较清爽
+	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
 
-// UserHandler 我准备在它上面定义跟用户有关的路由
+	userIdKey = "userId"
+	bizLogin  = "login"
+)
+
+var _ handler = &UserHandler{}
+
 type UserHandler struct {
-	svc         service.UserService
-	codeSvc     service.CodeService
-	emailExp    *regexp.Regexp
-	passwordExp *regexp.Regexp
-	phoneExp    *regexp.Regexp
+	svc              service.UserService
+	codeSvc          service.CodeService
+	emailRegexExp    *regexp.Regexp
+	passwordRegexExp *regexp.Regexp
 	ijwt.Handler
-	cmd redis.Cmdable
 }
 
 func NewUserHandler(svc service.UserService,
-	codeSvc service.CodeService,
-	jwtHdl ijwt.Handler) *UserHandler {
-	const (
-		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
-		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
-		phoneRegexPattern    = `^1[3456789]\d{9}$`
-	)
-	emailExp := regexp.MustCompile(emailRegexPattern, regexp.None)
-	passwordExp := regexp.MustCompile(passwordRegexPattern, regexp.None)
-	phoneExp := regexp.MustCompile(phoneRegexPattern, regexp.None)
+	codeSvc service.CodeService, jwthdl ijwt.Handler) *UserHandler {
 	return &UserHandler{
-		svc:         svc,
-		emailExp:    emailExp,
-		passwordExp: passwordExp,
-		Handler:     jwtHdl,
-		phoneExp:    phoneExp,
-		codeSvc:     codeSvc,
+		svc:              svc,
+		codeSvc:          codeSvc,
+		emailRegexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
+		passwordRegexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
+		Handler:          jwthdl,
 	}
 }
 
-func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
+func (c *UserHandler) RegisterRoutes(server *gin.Engine) {
+	// 直接注册
+	//server.POST("/users/signup", c.SignUp)
+	//server.POST("/users/login", c.Login)
+	//server.POST("/users/edit", c.Edit)
+	//server.GET("/users/profile", c.Profile)
+
+	// 分组注册
 	ug := server.Group("/users")
-	//
-	ug.GET("/profile", u.ProfileJWT)
-	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.LoginJWT)
-	ug.POST("/logout", u.LogoutJWT)
-	ug.POST("/edit", u.Edit)
-	ug.POST("/login_sms/code/send", u.SendLoginSMSCode)
-	ug.POST("/login_sms", u.LoginSMS)
-	ug.POST("/refresh_token", u.RefreshToken)
+	ug.POST("/signup", c.SignUp)
+	// session 机制
+	//ug.POST("/login", c.Login)
+	// JWT 机制
+	ug.POST("/login", c.LoginJWT)
+	ug.POST("/logout", c.Logout)
+	ug.POST("/edit", c.Edit)
+	//ug.GET("/profile", c.Profile)
+	ug.GET("/profile", c.ProfileJWT)
+	ug.POST("/login_sms/code/send", c.SendSMSLoginCode)
+	ug.POST("/login_sms", c.LoginSMS)
+	ug.POST("/refresh_token", c.RefreshToken)
 }
 
-func (u *UserHandler) LoginJWT(ctx *gin.Context) {
-	type LoginReq struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-
-	var req LoginReq
-	if err := ctx.Bind(&req); err != nil {
-		return
-	}
-	user, err := u.svc.Login(ctx, req.Email, req.Password)
-	if err == service.ErrInvalidUserOrPassword {
-		ctx.String(http.StatusOK, "用户名或密码不对")
-		return
-	}
-	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
-		return
-	}
-	if err = u.SetLoginToken(ctx, user.Id); err != nil {
-		ctx.String(http.StatusOK, "系统错误")
-		return
-	}
-
-	ctx.String(http.StatusOK, "登录成功")
-	return
-}
-
-// todo 可以跳转到登录页面
-func (u *UserHandler) SignUp(ctx *gin.Context) {
-	type SignUpReq struct {
-		Email           string `json:"email"`
-		ConfirmPassword string `json:"confirmPassword"`
-		Password        string `json:"password"`
-	}
-	var req SignUpReq
-	// Bind 方法会根据 Content-Type 来解析你的数据到 req 里面
-	// 解析错了，就会直接写回一个 400 的错误
-	if err := ctx.Bind(&req); err != nil {
-		return
-	}
-	ok, err := u.emailExp.MatchString(req.Email)
-	if err != nil {
-		zap.L().Error("邮箱匹配错误",
-			zap.Error(err))
-		ctx.String(http.StatusOK, "系统错误")
-		return
-	}
-	if !ok {
-		zap.L().Error("邮箱格式错误",
-			zap.String("email", req.Email))
-		ctx.String(http.StatusOK, "你的邮箱格式不对")
-		return
-	}
-	if req.ConfirmPassword != req.Password {
-		zap.L().Error("密码不匹配",
-			zap.String("email", req.Email))
-		ctx.String(http.StatusOK, "两次输入的密码不一致")
-		return
-	}
-	ok, err = u.passwordExp.MatchString(req.Password)
-	if err != nil {
-		// 记录日志
-		zap.L().Error("密码正则匹配错误",
-			zap.Error(err))
-		ctx.String(http.StatusOK, "系统错误")
-		return
-	}
-	if !ok {
-		ctx.String(http.StatusOK, "密码必须大于8位，包含数字、特殊字符")
-		return
-	}
-
-	// 调用一下 svc 的方法
-	err = u.svc.SignUp(ctx, domain.User{
-		Email:    req.Email,
-		PassWord: req.Password,
+func (c *UserHandler) RefreshToken(ctx *gin.Context) {
+	// 假定长 token 也放在这里
+	tokenStr := c.ExtractTokenString(ctx)
+	var rc ijwt.RefreshClaims
+	token, err := jwt.ParseWithClaims(tokenStr, &rc, func(token *jwt.Token) (interface{}, error) {
+		return ijwt.RefreshTokenKey, nil
 	})
-	if err == service.ErrUserDuplicateEmail {
-		ctx.String(http.StatusOK, "邮箱冲突")
+	// 这边要保持和登录校验一直的逻辑，即返回 401 响应
+	if err != nil || token == nil || !token.Valid {
+		ctx.JSON(http.StatusUnauthorized, Result{Code: 4, Msg: "请登录"})
 		return
 	}
+
+	// 校验 ssid
+	err = c.CheckSession(ctx, rc.Ssid)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统异常")
+		// 系统错误或者用户已经主动退出登录了
+		// 这里也可以考虑说，如果在 Redis 已经崩溃的时候，
+		// 就不要去校验是不是已经主动退出登录了。
+		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
-	ctx.String(http.StatusOK, "注册成功")
-}
-
-// ProfileJWT
-func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
-	c, _ := ctx.Get("claims")
-	claims, ok := c.(*ijwt.UserClaims)
-	if !ok {
-		zap.L().Error("claims 类型断言失败")
-		ctx.String(http.StatusOK, "系统异常")
-		return
-	}
-	user, err := u.svc.Profile(ctx, claims.Id)
+	err = c.SetJWTToken(ctx, rc.Ssid, rc.Id)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统异常")
+		ctx.JSON(http.StatusUnauthorized, Result{Code: 4, Msg: "请登录"})
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Data: user,
-	})
+	ctx.JSON(http.StatusOK, Result{Msg: "刷新成功"})
 }
 
-func (u *UserHandler) Edit(ctx *gin.Context) {
-	//todo
-	//type Req struct {
-	//	Id      int64
-	//	NickName string `json:"nickName"`
-	//}
-	//var req Req
-	//if err := ctx.Bind(&req); err != nil {
-	//	return
-	//}
-	//uc := ctx.MustGet("user").(ijwt.UserClaims)
-	//err := u.svc.Edit(ctx, domain.User{
-	//	Id:       req.Id,
-	//	NickName: req.NickName,
-	//})
-	//if err != nil {
-	//	ctx.JSON(http.StatusOK, Result{
-	//		Code: 5,
-	//		Msg: "编辑失败",
-	//	})
-	//	return
-	//}
-}
-
-func (u *UserHandler) LoginSMS(ctx *gin.Context) {
+func (c *UserHandler) LoginSMS(ctx *gin.Context) {
 	type Req struct {
 		Phone string `json:"phone"`
 		Code  string `json:"code"`
@@ -201,55 +107,36 @@ func (u *UserHandler) LoginSMS(ctx *gin.Context) {
 	if err := ctx.Bind(&req); err != nil {
 		return
 	}
-	ok, err := u.codeSvc.Verify(ctx, biz, req.Phone, req.Code)
+	ok, err := c.codeSvc.Verify(ctx, bizLogin, req.Phone, req.Code)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
-		})
-		zap.L().Error("校验验证码出错", zap.Error(err),
-			// 不能这样打，因为手机号码是敏感数据，你不能达到日志里面
-			// 打印加密后的串
-			// 脱敏，152****1234
-			zap.String("手机号码", req.Phone))
-		// 最多最多就这样
-		zap.L().Debug("", zap.String("手机号码", req.Phone))
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
+		zap.L().Error("用户手机号码登录失败", zap.Error(err))
 		return
 	}
 	if !ok {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 4,
-			Msg:  "验证码有误",
-		})
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "验证码错误"})
 		return
 	}
-	// 我这个手机号，会不会是一个新用户呢？
-	// 这样子
-	user, err := u.svc.FindOrCreate(ctx, req.Phone)
+
+	// 验证码是对的
+	// 登录或者注册用户
+	u, err := c.svc.FindOrCreate(ctx, req.Phone)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
-		})
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "系统错误"})
 		return
 	}
-
-	if err = u.SetLoginToken(ctx, user.Id); err != nil {
-		// 记录日志
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
-		})
+	// 用 uuid 来标识这一次会话
+	ssid := uuid.New().String()
+	err = c.SetJWTToken(ctx, ssid, u.Id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{Msg: "系统错误"})
 		return
 	}
-
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "验证码校验通过",
-	})
-
+	ctx.JSON(http.StatusOK, Result{Msg: "登录成功"})
 }
 
-func (u *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
+// SendSMSLoginCode 发送短信验证码
+func (c *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 	type Req struct {
 		Phone string `json:"phone"`
 	}
@@ -257,87 +144,239 @@ func (u *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
 	if err := ctx.Bind(&req); err != nil {
 		return
 	}
-	// 是不是一个合法的手机号码
-	// 考虑正则表达式
-	ok, err := u.phoneExp.MatchString(req.Phone)
-	if err != nil {
-		zap.L().Error("系统错误", zap.Error(err))
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
-		})
+	// 你也可以用正则表达式校验是不是合法的手机号
+	if req.Phone == "" {
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "请输入手机号码"})
 		return
 	}
-	if !ok {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 4,
-			Msg:  "手机号码格式不对",
-		})
-		return
-	}
-	err = u.codeSvc.Send(ctx, biz, req.Phone)
+	err := c.codeSvc.Send(ctx, bizLogin, req.Phone)
 	switch err {
 	case nil:
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "发送成功",
-		})
+		ctx.JSON(http.StatusOK, Result{Msg: "发送成功"})
 	case service.ErrCodeSendTooMany:
-		zap.L().Warn("短信发送太频繁",
-			zap.Error(err))
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "发送太频繁，请稍后再试",
-		})
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "短信发送太频繁，请稍后再试"})
 	default:
-		zap.L().Error("短信发送失败",
-			zap.Error(err))
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
-		})
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
+		// 要打印日志
+		return
 	}
 }
 
-// Refresh Token
-func (u *UserHandler) RefreshToken(ctx *gin.Context) {
-	refreshToken := u.ExtractToken(ctx)
-	var rc ijwt.RefreshClaims
-	token, err := jwt.ParseWithClaims(refreshToken, &rc, func(token *jwt.Token) (interface{}, error) {
-		return ijwt.RtKey, nil
-	})
-	if err != nil || !token.Valid {
-		zap.L().Error("系统错误", zap.Error(err))
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+// SignUp 用户注册接口
+func (c *UserHandler) SignUp(ctx *gin.Context) {
+	type SignUpReq struct {
+		Email           string `json:"email"`
+		Password        string `json:"password"`
+		ConfirmPassword string `json:"confirmPassword"`
+	}
+
+	var req SignUpReq
+	// 当我们调用 Bind 方法的时候，如果有问题，Bind 方法已经直接写响应回去了
+	if err := ctx.Bind(&req); err != nil {
 		return
 	}
-	err = u.CheckSession(ctx, rc.Ssid)
+
+	isEmail, err := c.emailRegexExp.MatchString(req.Email)
 	if err != nil {
-		zap.L().Error("系统错误", zap.Error(err))
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	err = u.SetJWTToken(ctx, rc.Uid, rc.Ssid)
+	if !isEmail {
+		ctx.String(http.StatusOK, "邮箱不正确")
+		return
+	}
+
+	if req.Password != req.ConfirmPassword {
+		ctx.String(http.StatusOK, "两次输入的密码不相同")
+		return
+	}
+
+	isPassword, err := c.passwordRegexExp.MatchString(req.Password)
 	if err != nil {
-		zap.L().Error("系统错误", zap.Error(err))
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		zap.L().Error("JWT 续约失败",
-			zap.Error(err),
-			zap.String("token", refreshToken))
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	if !isPassword {
+		ctx.String(http.StatusOK,
+			"密码必须包含数字、特殊字符，并且长度不能小于 8 位")
+		return
+	}
+
+	err = c.svc.Signup(ctx.Request.Context(),
+		domain.User{Email: req.Email, Password: req.ConfirmPassword})
+
+	if err == service.ErrUserDuplicateEmail {
+		ctx.String(http.StatusOK, "重复邮箱，请换一个邮箱")
+		return
+	}
+	if err != nil {
+		ctx.String(http.StatusOK, "服务器异常，注册失败")
+		return
+	}
+	ctx.String(http.StatusOK, "hello, 注册成功")
+}
+
+// LoginJWT 用户登录接口，使用的是 JWT，如果你想要测试 JWT，就启用这个
+func (c *UserHandler) LoginJWT(ctx *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	var req LoginReq
+	// 当我们调用 Bind 方法的时候，如果有问题，Bind 方法已经直接写响应回去了
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	u, err := c.svc.Login(ctx.Request.Context(), req.Email, req.Password)
+	if err == service.ErrInvalidUserOrPassword {
+		ctx.String(http.StatusOK, "用户名或者密码不正确，请重试")
+		return
+	}
+	err = c.SetLoginToken(ctx, u.Id)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统异常")
+		return
+	}
+	ctx.String(http.StatusOK, "登录成功")
+}
+
+func (c *UserHandler) Logout(ctx *gin.Context) {
+	err := c.ClearToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "系统错误",
+		})
+		return
 	}
 	ctx.JSON(http.StatusOK, Result{
 		Msg: "OK",
 	})
 }
 
-func (u *UserHandler) LogoutJWT(ctx *gin.Context) {
-	err := u.ClearToken(ctx)
-	if err != nil {
-		zap.L().Error("系统错误", zap.Error(err))
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "退出登陆失败",
-		})
+// Login 用户登录接口
+func (c *UserHandler) Login(ctx *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "退出登陆成功",
+
+	var req LoginReq
+	// 当我们调用 Bind 方法的时候，如果有问题，Bind 方法已经直接写响应回去了
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	u, err := c.svc.Login(ctx.Request.Context(), req.Email, req.Password)
+	if err == service.ErrInvalidUserOrPassword {
+		ctx.String(http.StatusOK, "用户名或者密码不正确，请重试")
+		return
+	}
+	sess := sessions.Default(ctx)
+	sess.Set(userIdKey, u.Id)
+	sess.Options(sessions.Options{
+		// 60 秒过期
+		MaxAge: 60,
+	})
+	err = sess.Save()
+	if err != nil {
+		ctx.String(http.StatusOK, "服务器异常")
+		return
+	}
+	ctx.String(http.StatusOK, "登录成功")
+}
+
+// Edit 用户编译信息
+func (c *UserHandler) Edit(ctx *gin.Context) {
+	type Req struct {
+		// 注意，其它字段，尤其是密码、邮箱和手机，
+		// 修改都要通过别的手段
+		// 邮箱和手机都要验证
+		// 密码更加不用多说了
+		Nickname string `json:"nickname"`
+		// 2023-01-01
+		Birthday string `json:"birthday"`
+		AboutMe  string `json:"aboutMe"`
+	}
+
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	// 你可以尝试在这里校验。
+	// 比如说你可以要求 Nickname 必须不为空
+	// 校验规则取决于产品经理
+	if req.Nickname == "" {
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "昵称不能为空"})
+		return
+	}
+
+	if len(req.AboutMe) > 1024 {
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "关于我过长"})
+		return
+	}
+	birthday, err := time.Parse(time.DateOnly, req.Birthday)
+	if err != nil {
+		// 也就是说，我们其实并没有直接校验具体的格式
+		// 而是如果你能转化过来，那就说明没问题
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "日期格式不对"})
+		return
+	}
+
+	uc := ctx.MustGet("user").(ijwt.UserClaims)
+	err = c.svc.UpdateNonSensitiveInfo(ctx, domain.User{
+		Id:       uc.Id,
+		Nickname: req.Nickname,
+		AboutMe:  req.AboutMe,
+		Birthday: birthday,
+	})
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
+}
+
+// ProfileJWT 用户详情, JWT 版本
+func (c *UserHandler) ProfileJWT(ctx *gin.Context) {
+	type Profile struct {
+		Email    string
+		Phone    string
+		Nickname string
+		Birthday string
+		AboutMe  string
+	}
+	uc := ctx.MustGet("user").(ijwt.UserClaims)
+	u, err := c.svc.Profile(ctx, uc.Id)
+	if err != nil {
+		// 按照道理来说，这边 id 对应的数据肯定存在，所以要是没找到，
+		// 那就说明是系统出了问题。
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	ctx.JSON(http.StatusOK, Profile{
+		Email:    u.Email,
+		Phone:    u.Phone,
+		Nickname: u.Nickname,
+		Birthday: u.Birthday.Format(time.DateOnly),
+		AboutMe:  u.AboutMe,
+	})
+}
+
+// Profile 用户详情
+func (c *UserHandler) Profile(ctx *gin.Context) {
+	type Profile struct {
+		Email string
+	}
+	sess := sessions.Default(ctx)
+	id := sess.Get(userIdKey).(int64)
+	u, err := c.svc.Profile(ctx, id)
+	if err != nil {
+		// 按照道理来说，这边 id 对应的数据肯定存在，所以要是没找到，
+		// 那就说明是系统出了问题。
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	ctx.JSON(http.StatusOK, Profile{
+		Email: u.Email,
 	})
 }

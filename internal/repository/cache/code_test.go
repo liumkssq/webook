@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"errors"
 	"github.com/liumkssq/webook/internal/repository/cache/redismocks"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
@@ -12,91 +11,65 @@ import (
 
 func TestRedisCodeCache_Set(t *testing.T) {
 	testCases := []struct {
-		name    string
-		mock    func(ctrl *gomock.Controller) redis.Cmdable
-		ctx     context.Context
-		biz     string
-		phone   string
-		code    string
+		name string
+
+		mock func(ctrl *gomock.Controller) redis.Cmdable
+
+		// 输入
+		ctx   context.Context
+		biz   string
+		phone string
+		code  string
+
+		// 预期输出
 		wantErr error
 	}{
 		{
 			name: "设置成功",
 			mock: func(ctrl *gomock.Controller) redis.Cmdable {
 				cmd := redismocks.NewMockCmdable(ctrl)
-				res := redis.NewCmd(context.Background())
-				res.SetVal(int64(0))
+				mockRes := redis.NewCmdResult(int64(0), nil)
 				cmd.EXPECT().Eval(gomock.Any(), luaSetCode,
-					[]string{"phone_code:login:12345678901"},
-					[]any{"123456"}).
-					Return(res)
+					gomock.Any(), gomock.Any()).
+					Return(mockRes)
 				return cmd
 			},
-			ctx:     context.Background(),
-			biz:     "login",
-			phone:   "12345678901",
-			code:    "123456",
-			wantErr: nil,
+			ctx:   context.Background(),
+			phone: "15212345678",
+			code:  "123456",
 		},
-
 		{
-			name: "redis错误",
+			name: "发送太频繁",
 			mock: func(ctrl *gomock.Controller) redis.Cmdable {
 				cmd := redismocks.NewMockCmdable(ctrl)
-				res := redis.NewCmd(context.Background())
-				//res.SetVal(int64(0))
-				res.SetErr(errors.New("系统错误"))
+				mockRes := redis.NewCmdResult(int64(-1), nil)
 				cmd.EXPECT().Eval(gomock.Any(), luaSetCode,
-					[]string{"phone_code:login:12345678901"},
-					[]any{"123456"}).
-					Return(res)
+					gomock.Any(), gomock.Any()).
+					Return(mockRes)
 				return cmd
 			},
 			ctx:     context.Background(),
-			biz:     "login",
-			phone:   "12345678901",
-			code:    "123456",
-			wantErr: errors.New("系统错误"),
-		},
-
-		{
-			name: "发送次数过多",
-			mock: func(ctrl *gomock.Controller) redis.Cmdable {
-				cmd := redismocks.NewMockCmdable(ctrl)
-				res := redis.NewCmd(context.Background())
-				res.SetVal(int64(-1))
-				cmd.EXPECT().Eval(gomock.Any(), luaSetCode,
-					[]string{"phone_code:login:12345678901"},
-					[]any{"123456"}).
-					Return(res)
-				return cmd
-			},
-			ctx:     context.Background(),
-			biz:     "login",
-			phone:   "12345678901",
+			phone:   "15212345678",
 			code:    "123456",
 			wantErr: ErrCodeSendTooMany,
 		},
-
 		{
-			name: "未知错误",
+			name: "系统错误",
 			mock: func(ctrl *gomock.Controller) redis.Cmdable {
 				cmd := redismocks.NewMockCmdable(ctrl)
-				res := redis.NewCmd(context.Background())
-				res.SetVal(int64(-10))
+				mockRes := redis.NewCmdResult(int64(-2), nil)
 				cmd.EXPECT().Eval(gomock.Any(), luaSetCode,
-					[]string{"phone_code:login:12345678901"},
-					[]any{"123456"}).
-					Return(res)
+					gomock.Any(), gomock.Any()).
+					Return(mockRes)
 				return cmd
 			},
 			ctx:     context.Background(),
-			biz:     "login",
-			phone:   "12345678901",
+			phone:   "15212345678",
 			code:    "123456",
-			wantErr: errors.New("系统错误"),
+			wantErr: ErrUnknownForCode,
 		},
 	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)

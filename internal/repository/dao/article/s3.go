@@ -6,18 +6,19 @@ import (
 	_ "github.com/aws/aws-sdk-go"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/ecodeclub/ekit"
+	"github.com/liumkssq/webook/internal/domain"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"strconv"
 	"time"
 )
 
+var statusPrivate = domain.ArticleStatusPrivate.ToUint8()
+
 type S3DAO struct {
 	oss *s3.S3
 	// 通过组合 GORMArticleDAO 来简化操作
 	// 当然在实践中，你是不太会有组合的机会
-	// 你操作制作库总是一样的
-	// 你就是操作线上库的时候不一样
 	GORMArticleDAO
 	bucket *string
 }
@@ -37,18 +38,13 @@ func NewOssDAO(oss *s3.S3, db *gorm.DB) ArticleDAO {
 }
 
 func (o *S3DAO) Sync(ctx context.Context, art Article) (int64, error) {
-	// 保存制作库
-	// 保存线上库，并且把 content 上传到 OSS
-	//
-	var (
-		id = art.Id
-	)
-	// 制作库流量不大，并发不高，你就保存到数据库就可以
-	// 当然，有钱或者体量大，就还是考虑 OSS
+	// 这一部分和 GORM 的实现差不多
 	err := o.db.Transaction(func(tx *gorm.DB) error {
-		var err error
+		var (
+			id  = art.Id
+			err error
+		)
 		now := time.Now().UnixMilli()
-		// 制作库
 		txDAO := NewGORMArticleDAO(tx)
 		if id == 0 {
 			id, err = txDAO.Insert(ctx, art)
@@ -59,6 +55,7 @@ func (o *S3DAO) Sync(ctx context.Context, art Article) (int64, error) {
 			return err
 		}
 		art.Id = id
+		// PublishedArticleV1 不具备 Content
 		publishArt := PublishedArticleV1{
 			Id:       art.Id,
 			Title:    art.Title,
@@ -67,33 +64,62 @@ func (o *S3DAO) Sync(ctx context.Context, art Article) (int64, error) {
 			Ctime:    now,
 			Utime:    now,
 		}
-		// 线上库不保存 Content,要准备上传到 OSS 里面
 		return tx.Clauses(clause.OnConflict{
 			// ID 冲突的时候。实际上，在 MYSQL 里面你写不写都可以
 			Columns: []clause.Column{{Name: "id"}},
+			// 这里没有更新 Content，
+			//
 			DoUpdates: clause.Assignments(map[string]interface{}{
-				"title":  art.Title,
+				"title":  publishArt.Title,
+				"status": publishArt.Status,
 				"utime":  now,
-				"status": art.Status,
-				// 要参与 SQL 运算的
 			}),
 		}).Create(&publishArt).Error
 	})
-	// 说明保存到数据库的时候失败了
 	if err != nil {
 		return 0, err
 	}
-	// 接下来就是保存到 OSS 里面
-	// 你要有监控，你要有重试，你要有补偿机制
+
+	// 最后同步到 OSS 上，但是只同步了 Content
 	_, err = o.oss.PutObjectWithContext(ctx, &s3.PutObjectInput{
 		Bucket:      o.bucket,
 		Key:         ekit.ToPtr[string](strconv.FormatInt(art.Id, 10)),
 		Body:        bytes.NewReader([]byte(art.Content)),
 		ContentType: ekit.ToPtr[string]("text/plain;charset=utf-8"),
 	})
-	return id, err
+	return art.Id, err
 }
 
 func (o *S3DAO) SyncStatus(ctx context.Context, author, id int64, status uint8) error {
-	panic("implement me")
+	err := o.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&Article{}).
+			Where("id=? AND author_id = ?", id, author).
+			Update("status", status)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			return ErrPossibleIncorrectAuthor
+		}
+
+		res = tx.Model(&PublishedArticleV1{}).
+			Where("id=? AND author_id = ?", id, author).Update("status", status)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			return ErrPossibleIncorrectAuthor
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if status == statusPrivate {
+		_, err = o.oss.DeleteObjectWithContext(ctx, &s3.DeleteObjectInput{
+			Bucket: o.bucket,
+			Key:    ekit.ToPtr[string](strconv.FormatInt(id, 10)),
+		})
+	}
+	return err
 }

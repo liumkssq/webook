@@ -5,63 +5,60 @@ import (
 	"fmt"
 	"github.com/liumkssq/webook/internal/repository"
 	"github.com/liumkssq/webook/internal/service/sms"
-	"go.uber.org/atomic"
-	"golang.org/x/exp/rand"
+	"math/rand"
 )
 
-// 短信模板
-var codeTplId atomic.String = atomic.String{}
+var ErrCodeSendTooMany = repository.ErrCodeSendTooMany
 
-var (
-	ErrCodeVerifyTooManyTimes = repository.ErrCodeVerifyTooManyTimes
-	ErrCodeSendTooMany        = repository.ErrCodeSendTooMany
-)
+const codeTplId = "1877556"
 
+//go:generate mockgen -source=./code.go -package=svcmocks -destination=mocks/code.mock.go CodeService
 type CodeService interface {
-	Send(ctx context.Context,
-		// 区别业务场景
-		biz string, phone string) error
-	Verify(ctx context.Context, biz string,
-		phone string, inputCode string) (bool, error)
-}
-type codeService struct {
-	repo   repository.CodeRepository
-	smsSvc sms.Service
-	//tplId string
+	Send(ctx context.Context, biz string, phone string) error
+	Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error)
 }
 
-func (svc *codeService) Send(ctx context.Context,
-	biz string, phone string) error {
-	code := svc.generateCode()
-	err := svc.repo.Store(ctx, biz, phone, code)
+// SMSCodeService 短信验证码的实现
+type SMSCodeService struct {
+	sms  sms.Service
+	repo repository.CodeRepository
+}
+
+func NewSMSCodeService(svc sms.Service, repo repository.CodeRepository) CodeService {
+	return &SMSCodeService{
+		sms:  svc,
+		repo: repo,
+	}
+}
+
+// Send 生成一个随机验证码，并发送
+func (c *SMSCodeService) Send(ctx context.Context, biz string, phone string) error {
+	code := c.generate()
+	err := c.repo.Store(ctx, biz, phone, code)
 	if err != nil {
 		return err
 	}
-	err = svc.smsSvc.Send(ctx, codeTplId.Load(), []string{code}, phone)
-	if err != nil {
-		// Send 短信失败，记录日志，但是不返回错误
-		//retryable
-		err = fmt.Errorf("短信服务不可用: %w", err)
-	}
+	err = c.sms.Send(ctx, codeTplId, []string{code}, phone)
 	return err
 }
 
-func (svc *codeService) Verify(ctx context.Context,
-	biz string, phone string,
+// Verify 验证验证码
+func (c *SMSCodeService) Verify(ctx context.Context,
+	biz string,
+	phone string,
 	inputCode string) (bool, error) {
-	return svc.repo.Verify(ctx, biz, phone, inputCode)
+	ok, err := c.repo.Verify(ctx, biz, phone, inputCode)
+	// 这里我们在 service 层面上对 RedisHandler 屏蔽了最为特殊的错误
+	if err == repository.ErrCodeVerifyTooManyTimes {
+		// 在接入了告警之后，这边要告警
+		// 因为这意味着有人在搞你
+		return false, nil
+	}
+	return ok, err
 }
 
-func (svc *codeService) generateCode() string {
-	// 六位数，num 在 0, 999999 之间，包含 0 和 999999
-	num := rand.Intn(1000000)
-	// 不够六位的，加上前导 0
-	// 000001
-	return fmt.Sprintf("%06d", num)
-}
-
-func NewCodeService(repo repository.CodeRepository, smsSvc sms.Service) CodeService {
-	// 类似Java thread-local
-	codeTplId.Store("191919")
-	return &codeService{repo: repo, smsSvc: smsSvc}
+func (c *SMSCodeService) generate() string {
+	// 用随机数生成一个
+	num := rand.Intn(999999)
+	return fmt.Sprintf("%6d", num)
 }

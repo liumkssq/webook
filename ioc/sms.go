@@ -1,40 +1,41 @@
 package ioc
 
 import (
-	mysms "github.com/liumkssq/webook/internal/service/sms"
-	"github.com/liumkssq/webook/internal/service/sms/memory"
-	"github.com/redis/go-redis/v9"
+	"github.com/liumkssq/webook/internal/service/sms"
+	"github.com/liumkssq/webook/internal/service/sms/localsms"
+	"github.com/liumkssq/webook/internal/service/sms/tencent"
+	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
+	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
+	tencentSMS "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111"
+	"os"
 )
 
-//	func initAliYunSMS() *aliyun.Service {
-//		secretId, ok := os.LookupEnv("ALIBABA_CLOUD_ACCESS_KEY_ID")
-//		if !ok {
-//			zap.L().Fatal("ALIBABA_CLOUD_ACCESS_KEY_ID not found")
-//		}
-//		secretKey, ok := os.LookupEnv("ALIBABA_CLOUD_ACCESS_KEY_SECRET")
-//		if !ok {
-//			zap.L().Fatal("ALIBABA_CLOUD_ACCESS_KEY_SECRET not found")
-//		}
-//
-//		config := &openapi.Config{
-//			AccessKeyId:     ekit.ToPtr[string](secretId),
-//			AccessKeySecret: ekit.ToPtr[string](secretKey),
-//		}
-//		config.Endpoint = tea.String("dysmsapi.aliyuncs.com")
-//		client, err := sms.NewClient(config)
-//		if err != nil {
-//			zap.L().Fatal("阿里云短信服务初始化失败", zap.Error(err))
-//		}
-//		if client == nil {
-//			panic("client is nil")
-//		}
-//		service := aliyun.NewService(client)
-//		return service
-//	}
-func InitSMSService(cmd redis.Cmdable) mysms.Service {
-	// 换内存，还是换别的
-	//svc := ratelimit.NewRatelimitSMSService(memory.NewService(),
-	//	limiter.NewRedisSlidingWindowLimiter(cmd, time.Second, 100))
-	//return retryable.NewService(svc, 3)
-	return memory.NewService()
+func InitSmsService() sms.Service {
+	//return initSmsTencentService()
+	return InitSmsMemoryService()
+}
+
+func initSmsTencentService() sms.Service {
+	// 在这里你也可以考虑从配置文件里面读取
+	secretId, ok := os.LookupEnv("SMS_SECRET_ID")
+	if !ok {
+		panic("没有找到环境变量 SMS_SECRET_ID ")
+	}
+	secretKey, ok := os.LookupEnv("SMS_SECRET_KEY")
+	if !ok {
+		panic("没有找到环境变量 SMS_SECRET_KEY")
+	}
+
+	c, err := tencentSMS.NewClient(common.NewCredential(secretId, secretKey),
+		"ap-nanjing",
+		profile.NewClientProfile())
+	if err != nil {
+		panic(err)
+	}
+	return tencent.NewService(c, "1400842696", "妙影科技")
+}
+
+// InitSmsMemoryService 使用基于内存，输出到控制台的实现
+func InitSmsMemoryService() sms.Service {
+	return localsms.NewService()
 }

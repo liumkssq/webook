@@ -7,9 +7,8 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	article2 "github.com/liumkssq/webook/internal/events/article"
 	"github.com/liumkssq/webook/internal/repository"
-	article2 "github.com/liumkssq/webook/internal/repository/article"
 	"github.com/liumkssq/webook/internal/repository/cache"
 	"github.com/liumkssq/webook/internal/repository/dao"
 	"github.com/liumkssq/webook/internal/repository/dao/article"
@@ -25,27 +24,41 @@ import (
 
 // Injectors from wire.go:
 
-func InitWebServer() *gin.Engine {
+func InitApp() *App {
 	cmdable := ioc.InitRedis()
-	handler := jwt.NewRedisJWTHandler(cmdable)
-	v := ioc.InitMiddlewares(cmdable, handler)
+	handler := jwt.NewRedisHandler(cmdable)
 	loggerV1 := ioc.InitLogger()
+	v := ioc.GinMiddlewares(cmdable, handler, loggerV1)
 	db := ioc.InitDB(loggerV1)
-	userDAO := dao.NewUserDAO(db)
+	userDAO := dao.NewGORMUserDAO(db)
 	userCache := cache.NewRedisUserCache(cmdable)
 	userRepository := repository.NewCachedUserRepository(userDAO, userCache)
-	userService := service.NewUserService(userRepository, loggerV1)
+	userService := service.NewUserService(userRepository)
+	smsService := ioc.InitSmsService()
 	codeCache := cache.NewRedisCodeCache(cmdable)
 	codeRepository := repository.NewCachedCodeRepository(codeCache)
-	smsService := ioc.InitSMSService(cmdable)
-	codeService := service.NewCodeService(codeRepository, smsService)
+	codeService := service.NewSMSCodeService(smsService, codeRepository)
 	userHandler := web.NewUserHandler(userService, codeService, handler)
 	articleDAO := article.NewGORMArticleDAO(db)
-	articleRepository := article2.NewArticleRepository(articleDAO)
-	articleService := service.NewArticleServiceV1(articleRepository)
-	articleHandler := web.NewArticleHandler(articleService, loggerV1)
+	articleCache := cache.NewRedisArticleCache(cmdable)
+	articleRepository := repository.NewArticleRepository(articleDAO, articleCache, userRepository, loggerV1)
+	client := ioc.InitKafka()
+	syncProducer := ioc.NewSyncProducer(client)
+	producer := article2.NewSaramaSyncProducer(syncProducer)
+	articleService := service.NewArticleService(articleRepository, loggerV1, producer)
+	interactiveDAO := dao.NewGORMInteractiveDAO(db)
+	interactiveCache := cache.NewRedisInteractiveCache(cmdable)
+	interactiveRepository := repository.NewCachedInteractiveRepository(interactiveDAO, interactiveCache, loggerV1)
+	interactiveService := service.NewInteractiveService(interactiveRepository, loggerV1)
+	articleHandler := web.NewArticleHandler(articleService, interactiveService, loggerV1)
 	wechatService := ioc.InitWechatService(loggerV1)
 	oAuth2WechatHandler := web.NewOAuth2WechatHandler(wechatService, userService, handler)
-	engine := ioc.InitWebServer(v, userHandler, articleHandler, oAuth2WechatHandler)
-	return engine
+	engine := ioc.InitWebServer(v, userHandler, articleHandler, oAuth2WechatHandler, loggerV1)
+	interactiveReadEventConsumer := article2.NewInteractiveReadEventConsumer(client, loggerV1, interactiveRepository)
+	v2 := ioc.NewConsumers(interactiveReadEventConsumer)
+	app := &App{
+		web:       engine,
+		consumers: v2,
+	}
+	return app
 }

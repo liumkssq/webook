@@ -17,7 +17,6 @@ type Article struct {
 type PublishedArticle Article
 
 // PublishedArticleV1 s3 演示专属
-
 type PublishedArticleV1 struct {
 	Id       int64  `gorm:"primaryKey,autoIncrement" bson:"id,omitempty"`
 	Title    string `gorm:"type=varchar(4096)" bson:"title,omitempty"`

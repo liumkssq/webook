@@ -6,6 +6,6 @@ import (
 )
 
 type App struct {
-	server   *gin.Engine
-	consumer []events.Consumer
+	web       *gin.Engine
+	consumers []events.Consumer
 }

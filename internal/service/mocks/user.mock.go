@@ -57,18 +57,18 @@ func (mr *MockUserServiceMockRecorder) FindOrCreate(ctx, phone any) *gomock.Call
 }
 
 // FindOrCreateByWechat mocks base method.
-func (m *MockUserService) FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error) {
+func (m *MockUserService) FindOrCreateByWechat(ctx context.Context, info domain.WechatInfo) (domain.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindOrCreateByWechat", ctx, wechatInfo)
+	ret := m.ctrl.Call(m, "FindOrCreateByWechat", ctx, info)
 	ret0, _ := ret[0].(domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindOrCreateByWechat indicates an expected call of FindOrCreateByWechat.
-func (mr *MockUserServiceMockRecorder) FindOrCreateByWechat(ctx, wechatInfo any) *gomock.Call {
+func (mr *MockUserServiceMockRecorder) FindOrCreateByWechat(ctx, info any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrCreateByWechat", reflect.TypeOf((*MockUserService)(nil).FindOrCreateByWechat), ctx, wechatInfo)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrCreateByWechat", reflect.TypeOf((*MockUserService)(nil).FindOrCreateByWechat), ctx, info)
 }
 
 // Login mocks base method.
@@ -101,16 +101,30 @@ func (mr *MockUserServiceMockRecorder) Profile(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Profile", reflect.TypeOf((*MockUserService)(nil).Profile), ctx, id)
 }
 
-// SignUp mocks base method.
-func (m *MockUserService) SignUp(ctx context.Context, u domain.User) error {
+// Signup mocks base method.
+func (m *MockUserService) Signup(ctx context.Context, u domain.User) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SignUp", ctx, u)
+	ret := m.ctrl.Call(m, "Signup", ctx, u)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SignUp indicates an expected call of SignUp.
-func (mr *MockUserServiceMockRecorder) SignUp(ctx, u any) *gomock.Call {
+// Signup indicates an expected call of Signup.
+func (mr *MockUserServiceMockRecorder) Signup(ctx, u any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SignUp", reflect.TypeOf((*MockUserService)(nil).SignUp), ctx, u)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Signup", reflect.TypeOf((*MockUserService)(nil).Signup), ctx, u)
+}
+
+// UpdateNonSensitiveInfo mocks base method.
+func (m *MockUserService) UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNonSensitiveInfo", ctx, user)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateNonSensitiveInfo indicates an expected call of UpdateNonSensitiveInfo.
+func (mr *MockUserServiceMockRecorder) UpdateNonSensitiveInfo(ctx, user any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNonSensitiveInfo", reflect.TypeOf((*MockUserService)(nil).UpdateNonSensitiveInfo), ctx, user)
 }
