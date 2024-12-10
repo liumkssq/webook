@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/liumkssq/webook/internal/domain"
+	events "github.com/liumkssq/webook/internal/events/article"
 	"github.com/liumkssq/webook/internal/repository/article"
 	"github.com/liumkssq/webook/pkg/logger"
 )
@@ -14,7 +15,7 @@ type ArticleService interface {
 	Withdraw(ctx *gin.Context, d domain.Article) error
 	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 	GetById(ctx context.Context, id int64) (domain.Article, error)
-	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
+	GetPublishedById(ctx context.Context, id, uid int64) (domain.Article, error)
 }
 type articleService struct {
 	repo article.ArticleRepository
@@ -23,6 +24,8 @@ type articleService struct {
 	author article.ArticleAuthorRepository
 	reader article.ArticleReaderRepository
 	l      logger.LoggerV1
+
+	producer events.Producer
 }
 
 func (a *articleService) List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
@@ -33,8 +36,21 @@ func (a *articleService) GetById(ctx context.Context, id int64) (domain.Article,
 	return a.repo.GetByID(ctx, id)
 }
 
-func (a *articleService) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
-	return a.repo.GetPublishedById(ctx, id)
+func (svc *articleService) GetPublishedById(ctx context.Context, id, uid int64) (domain.Article, error) {
+	art, err := svc.repo.GetPublishedById(ctx, id)
+	if err == nil {
+		go func() {
+			er := svc.producer.ProduceReadEvent(ctx,
+				events.ReadEvent{
+					Uid: uid,
+					Aid: id,
+				})
+			if er == nil {
+				svc.l.Error("同步阅读事件失败", logger.Error(er))
+			}
+		}()
+	}
+	return art, err
 }
 
 func (a *articleService) Withdraw(ctx *gin.Context, art domain.Article) error {
@@ -42,6 +58,7 @@ func (a *articleService) Withdraw(ctx *gin.Context, art domain.Article) error {
 }
 
 func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
+	art.Status = domain.ArticleStatusPublished
 	id, err := a.repo.Sync(ctx, art)
 	if err != nil {
 		return 0, err

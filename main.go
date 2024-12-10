@@ -8,13 +8,19 @@ import (
 
 func main() {
 	//initViperV1()
-	settings.CheckEtcdConnection()
+	//settings.CheckEtcdConnection()
 	//initViperRemote()
 	settings.InitViperV1()
 	//err := logger.InitLogger()
 
 	//fmt.Println(viper.AllKeys())
-	server := InitWebServer()
+	app := InitWebServer()
+	for _,c := app.consumers {
+		err := c.Start()
+		if err != nil {
+			panic(err)
+		}
+	}
 	zap.L().Info("服务器启动成功")
-	server.Run()
+	app.Run()
 }

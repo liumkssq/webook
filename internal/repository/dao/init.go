@@ -1,7 +1,17 @@
 package dao
 
-import "gorm.io/gorm"
+import (
+	"github.com/liumkssq/webook/internal/repository/dao/article"
+	"gorm.io/gorm"
+)
 
 func InitTable(db *gorm.DB) error {
-	return db.AutoMigrate(&User{})
+	return db.AutoMigrate(&User{},
+		&article.Article{},
+		&article.PublishedArticle{},
+		&Interactive{},
+		&UserLikeBiz{},
+		&Collection{},
+		&UserCollectionBiz{},
+	)
 }

@@ -58,7 +58,8 @@ func (dao *GORMArticleDAO) SyncStatus(ctx context.Context, author, id int64, sta
 		}
 
 		res = tx.Model(&PublishedArticle{}).
-			Where("id=? AND author_id = ?", id, author).Update("status", status)
+			Where("id=? AND author_id = ?", id, author).
+			Update("status", status)
 		if res.Error != nil {
 			return res.Error
 		}

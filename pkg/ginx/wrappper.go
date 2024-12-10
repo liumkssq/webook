@@ -1,9 +1,9 @@
 package ginx
 
 import (
-	"gitee.com/geekbang/basic-go/webook/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/liumkssq/webook/pkg/logger"
 	"net/http"
 )
 
