@@ -2,6 +2,8 @@ package grpcx
 
 import (
 	"context"
+	"github.com/liumkssq/webook/pkg/logger"
+	"github.com/liumkssq/webook/pkg/netx"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/naming/endpoints"
 	"google.golang.org/grpc"
@@ -12,7 +14,8 @@ import (
 
 type Server struct {
 	*grpc.Server
-	Port int
+	EtcdAddr string
+	Port     int
 	// ETCD 服务注册租约 TTL
 	EtcdTTL     int64
 	EtcdClient  *clientv3.Client

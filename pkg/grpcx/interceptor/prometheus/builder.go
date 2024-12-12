@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"context"
+	"github.com/liumkssq/webook/pkg/grpcx/interceptor"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
