@@ -1,0 +1,41 @@
+syntax="proto3";
+option go_package = "github.com/liumkssq/webook/grpc";
+
+message User {
+  int64 id = 1;
+  string name = 2;
+  string avatar = 3;
+  map<string,string> attributes = 4;
+  optional int32 age = 5;
+  repeated string nickname = 6;
+  Address address = 7;
+  repeated string phones = 8;
+
+  oneof contacts {
+    string email = 9;
+    string phone = 10;
+  }
+  Gender gender = 11;
+}
+
+message Address {
+
+}
+
+enum Gender {
+  UNKNOWN = 0;
+  MALE = 1;
+  FEMALE = 2;
+}
+
+service UserService {
+  rpc GetById(GetByIdReq) returns (GetByIdResp);
+}
+
+message GetByIdReq {
+  int64 id = 1;
+}
+
+message GetByIdResp {
+  User user = 1;
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/liumkssq/webook/internal/web/middleware"
 	"github.com/liumkssq/webook/pkg/ginx"
 	"github.com/liumkssq/webook/pkg/ginx/middleware/accesslog"
+	"github.com/liumkssq/webook/pkg/ginx/middleware/metric"
 	"github.com/liumkssq/webook/pkg/ginx/middleware/ratelimit"
 	"github.com/liumkssq/webook/pkg/logger"
 	"github.com/redis/go-redis/v9"
@@ -35,6 +36,13 @@ func InitWebServer(funcs []gin.HandlerFunc,
 func GinMiddlewares(cmd redis.Cmdable,
 	hdl ijwt.Handler, l logger.LoggerV1) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
+
+		(&metric.MiddlewareBuilder{
+			Namespace:  "gin",
+			Name:       "http",
+			Help:       "http 请求统计",
+			InstanceID: "001",
+		}).Builder(),
 		ratelimit.NewBuilder(cmd, time.Minute, 100).Build(),
 		corsHandler(),
 

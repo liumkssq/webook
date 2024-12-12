@@ -16,9 +16,10 @@ type ArticleService interface {
 	PublishV1(ctx context.Context, art domain.Article) (int64, error)
 	List(ctx context.Context, author int64,
 		offset, limit int) ([]domain.Article, error)
-	GetById(ctx context.Context, id int64) (domain.Article, error)
 
+	ListPub(ctx context.Context, offset, limit int) domain.Article
 	// 剩下的这个是给读者用的服务，暂时放到这里
+	GetByIds(ctx context.Context, ids []int64) (domain.Interactive, error)
 
 	// GetPublishedById 查找已经发表的
 	// 正常来说在微服务架构下，读者服务和创作者服务会是两个独立的服务
@@ -38,6 +39,16 @@ type articleService struct {
 
 	// 搞个异步的
 	producer events.Producer
+}
+
+func (svc *articleService) GetByIds(ctx context.Context, ids []int64) (domain.Interactive, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (svc *articleService) ListPub(ctx context.Context, offset, limit int) domain.Article {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (svc *articleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
@@ -135,14 +146,12 @@ func (svc *articleService) PublishV1(ctx context.Context,
 			break
 		}
 		svc.logger.Error("部分失败：保存数据到线上库失败",
-			logger.Field{Key: "art_id", Value: id},
 			logger.Error(err))
 		// 在接入了 metrics 或者 tracing 之后，
 		// 这边要进一步记录必要的DEBUG信息。
 	}
 	if err != nil {
 		svc.logger.Error("部分失败：保存数据到线上库重试都失败了",
-			logger.Field{Key: "art_id", Value: id},
 			logger.Error(err))
 		return 0, err
 	}

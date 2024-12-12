@@ -47,29 +47,29 @@ func WrapClaimsAndReq[Req any](fn func(*gin.Context, Req, UserClaims) (Result, e
 }
 
 // WrapClaims 复制粘贴
-func WrapClaims(fn func(*gin.Context, UserClaims) (Result, error)) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		// 可以用包变量来配置，还是那句话，因为泛型的限制，这里只能用包变量
-		rawVal, ok := ctx.Get("user")
-		if !ok {
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			log.Error("无法获得 claims",
-				logger.String("path", ctx.Request.URL.Path))
-			return
-		}
-		// 注意，这里要求放进去 ctx 的不能是*UserClaims，这是常见的一个错误
-		claims, ok := rawVal.(UserClaims)
-		if !ok {
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			log.Error("无法获得 claims",
-				logger.String("path", ctx.Request.URL.Path))
-			return
-		}
-		res, err := fn(ctx, claims)
-		if err != nil {
-			log.Error("执行业务逻辑失败",
-				logger.Error(err))
-		}
-		ctx.JSON(http.StatusOK, res)
-	}
-}
+//func WrapClaims(fn func(*gin.Context, UserClaims) (Result, error)) gin.HandlerFunc {
+//	return func(ctx *gin.Context) {
+//		// 可以用包变量来配置，还是那句话，因为泛型的限制，这里只能用包变量
+//		rawVal, ok := ctx.Get("user")
+//		if !ok {
+//			ctx.AbortWithStatus(http.StatusUnauthorized)
+//			log.Error("无法获得 claims",
+//				logger.String("path", ctx.Request.URL.Path))
+//			return
+//		}
+//		// 注意，这里要求放进去 ctx 的不能是*UserClaims，这是常见的一个错误
+//		claims, ok := rawVal.(UserClaims)
+//		if !ok {
+//			ctx.AbortWithStatus(http.StatusUnauthorized)
+//			log.Error("无法获得 claims",
+//				logger.String("path", ctx.Request.URL.Path))
+//			return
+//		}
+//		res, err := fn(ctx, claims)
+//		if err != nil {
+//			log.Error("执行业务逻辑失败",
+//				logger.Error(err))
+//		}
+//		ctx.JSON(http.StatusOK, res)
+//	}
+//}

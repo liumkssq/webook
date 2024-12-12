@@ -30,3 +30,9 @@ mock:
 	mockgen -source=internal/repository/dao/user.go -destination=internal/repository/dao/mocks/user.mock.go -package=daomocks
 	mockgen -source=internal/repository/cache/user.go -destination=internal/repository/cache/mocks/user.mock.go -package=cachemocks
 	mockgen -package=redismocks -destination=internal/repository/cache/redismocks/cmd.mock.go github.com/redis/go-redis/v9 Cmdable
+
+.PHONY: proto
+proto:
+	cd grpc
+	D:\Proto\bin\protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative user.proto
+	cd ..

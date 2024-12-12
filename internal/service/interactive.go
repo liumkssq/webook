@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+//go:generate mockgen -source=./interactive.go -package=svcmocks -destination=mocks/interactive  InteractiveService
 type InteractiveService interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
 	// Like 点赞
@@ -17,11 +18,17 @@ type InteractiveService interface {
 	// Collect 收藏
 	Collect(ctx context.Context, biz string, bizId, cid, uid int64) error
 	Get(ctx context.Context, biz string, bizId, uid int64) (domain.Interactive, error)
+	GetById(ctx context.Context, id int64) (domain.Article, error)
 }
 
 type interactiveService struct {
 	repo repository.InteractiveRepository
 	l    logger.LoggerV1
+}
+
+func (i *interactiveService) GetById(ctx context.Context, id int64) (domain.Article, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (i *interactiveService) IncrReadCnt(ctx context.Context, biz string, bizId int64) error {

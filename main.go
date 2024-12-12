@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
+	"net/http"
 	"time"
 )
 
@@ -14,6 +16,7 @@ func main() {
 	// 要把配置初始化放在最前面
 	initViperV2Watch()
 	//initLogger()
+	initPrometheus()
 	app := InitApp()
 	for _, c := range app.consumers {
 		err := c.Start()
@@ -24,6 +27,13 @@ func main() {
 	server := app.web
 	//注册路由
 	server.Run(":8080")
+}
+
+func initPrometheus() {
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":8081", nil)
+	}()
 }
 
 func initViperV2Watch() {
