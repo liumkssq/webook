@@ -4,6 +4,7 @@ package startup
 
 import (
 	"github.com/google/wire"
+	"github.com/liumkssq/webook/interactive/grpc"
 	repository2 "github.com/liumkssq/webook/interactive/repository"
 	cache2 "github.com/liumkssq/webook/interactive/repository/cache"
 	dao2 "github.com/liumkssq/webook/interactive/repository/dao"
@@ -18,6 +19,7 @@ var thirdPartySet = wire.NewSet( // 第三方依赖
 )
 
 var interactiveSvcSet = wire.NewSet(dao2.NewGORMInteractiveDAO,
+	//events2.NewInteractiveProducer,
 	cache2.NewInteractiveRedisCache,
 	repository2.NewCachedInteractiveRepository,
 	service2.NewInteractiveService,

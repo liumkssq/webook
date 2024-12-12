@@ -110,11 +110,13 @@ func (i *interactiveService) CancelLike(c context.Context, biz string, id int64,
 	return nil
 }
 
-func NewInteractiveService(repo repository.InteractiveRepository, l logger.LoggerV1, producer events.InteractiveProducer) InteractiveService {
+func NewInteractiveService(repo repository.InteractiveRepository,
+	l logger.LoggerV1,
+	/*producer events.InteractiveProducer*/) InteractiveService {
 	return &interactiveService{
-		repo:     repo,
-		l:        l,
-		producer: producer,
+		repo: repo,
+		l:    l,
+		//producer: producer,
 	}
 }
 
